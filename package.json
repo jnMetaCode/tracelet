@@ -9,11 +9,22 @@
   "main": "./src/server.js",
   "scripts": {
     "start": "node src/cli.js",
-    "dev": "node src/cli.js --port 4318"
+    "dev": "node src/cli.js --port 4318",
+    "test": "node --test test/run.js",
+    "demo": "node examples/demo.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/USER/tracelet.git"
+  },
+  "homepage": "https://github.com/USER/tracelet#readme",
+  "bugs": {
+    "url": "https://github.com/USER/tracelet/issues"
   },
   "files": [
     "src",
     "public",
+    "examples",
     "README.md"
   ],
   "keywords": [

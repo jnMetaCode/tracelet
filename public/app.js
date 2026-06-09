@@ -193,10 +193,16 @@ async function refreshList() {
 }
 
 // ---- live updates --------------------------------------------------------
+function setLive(on, text) {
+  const e = $('#live');
+  e.className = 'live ' + (on ? 'on' : 'off');
+  e.textContent = text;
+}
+
 function connect() {
   const es = new EventSource('/api/events');
-  es.onopen = () => $('#live').className = 'live on', ($('#live').textContent = '● live');
-  es.onerror = () => ($('#live').className = 'live off') && ($('#live').textContent = '● reconnecting');
+  es.onopen = () => setLive(true, '● live');
+  es.onerror = () => setLive(false, '● reconnecting');
   es.onmessage = async (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'clear') {
