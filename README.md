@@ -49,8 +49,10 @@ That's the standard OTLP/HTTP port — most setups need only:
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 ```
+
+Both OTLP/HTTP encodings work: **protobuf** (the exporter default) and **JSON**.
+No `OTEL_EXPORTER_OTLP_PROTOCOL` needed.
 
 ## Works with what you already use
 
@@ -90,7 +92,7 @@ Network tab, but for agent runs.
 ## How it works
 
 ```
-your agent ──OTLP/HTTP JSON──▶  :4318  ──▶  in-memory store  ──SSE──▶  UI :4321
+your agent ──OTLP/HTTP (pb|json)──▶  :4318  ──▶  in-memory store  ──SSE──▶  UI :4321
                                           (ring buffer, never persisted off-box)
 ```
 
@@ -114,7 +116,7 @@ npx tracelet [options]
 - [ ] Persist option (`--db traces.sqlite`) for opt-in local history
 - [ ] Diff two runs side by side
 - [ ] Cost estimates per model
-- [ ] protobuf OTLP ingest (currently JSON only)
+- [x] protobuf OTLP ingest (zero-dep decoder) — done
 - [ ] Waterfall flamegraph zoom
 - [ ] One-line wrappers: `tracelet/vercel`, `tracelet/langchain`
 

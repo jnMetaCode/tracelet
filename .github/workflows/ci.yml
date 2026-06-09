@@ -23,6 +23,7 @@ jobs:
           node --check src/cli.js
           node --check src/server.js
           node --check src/otlp.js
+          node --check src/otlp-protobuf.js
           node --check src/store.js
       - name: Test
         run: npm test

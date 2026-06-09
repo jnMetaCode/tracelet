@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize } from 'node:path';
 import { store } from './store.js';
 import { parseOtlp } from './otlp.js';
+import { decodeTraces } from './otlp-protobuf.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, '..', 'public');
@@ -49,14 +50,8 @@ async function handleTraces(req, res) {
   try {
     const buf = await readBody(req);
     const ct = req.headers['content-type'] || '';
-    if (ct.includes('protobuf')) {
-      // We accept JSON only for the zero-dependency MVP. Tell the user clearly.
-      return send(res, 415, {
-        error:
-          'Tracelet ingests OTLP/HTTP JSON. Set OTEL_EXPORTER_OTLP_PROTOCOL=http/json on your exporter.',
-      });
-    }
-    const json = JSON.parse(buf.toString('utf8') || '{}');
+    // Accept both OTLP/HTTP encodings: protobuf (the exporter default) and JSON.
+    const json = ct.includes('protobuf') ? decodeTraces(buf) : JSON.parse(buf.toString('utf8') || '{}');
     const spans = parseOtlp(json);
     if (spans.length) store.addSpans(spans);
     // OTLP expects an ExportTraceServiceResponse (empty object = success).

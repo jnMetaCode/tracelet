@@ -4,8 +4,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { parseOtlp } from '../src/otlp.js';
+import { decodeTraces } from '../src/otlp-protobuf.js';
 import { store } from '../src/store.js';
 import { startServer } from '../src/server.js';
+
+// Golden OTLP/protobuf payload, encoded by protobufjs against the official
+// opentelemetry-proto field numbers (see test/gen-fixture.mjs). Decoding this
+// validates our zero-dep decoder against the real wire format, not our own.
+const GOLDEN_PB_B64 =
+  'CpwECiEKHwoMc2VydmljZS5uYW1lEg8KDXdlYXRoZXItYWdlbnQS9gMKDQoEZGVtbxIFMS4wLjASzwIKEFuO//eYA4ED0mm2M4E/xgwSCO7hm37DwbF0IgAqD2FpLmdlbmVyYXRlVGV4dDABOQAAH8zlj9cXQQCMpRPmj9cXShwKDWdlbl9haS5zeXN0ZW0SCwoJYW50aHJvcGljSisKFGdlbl9haS5yZXF1ZXN0Lm1vZGVsEhMKEWNsYXVkZS1zb25uZXQtNC41Sh8KGWdlbl9haS51c2FnZS5pbnB1dF90b2tlbnMSAhgqSiEKGmdlbl9haS51c2FnZS5vdXRwdXRfdG9rZW5zEgMYgAFKGgoJYWkucHJvbXB0Eg0KC2hlbGxvIHRoZXJlShkKEGFpLnJlc3BvbnNlLnRleHQSBQoDaGkhWkAJAGXs6eWP1xcSFWdlbl9haS5jb250ZW50LnByb21wdBoeCg1nZW5fYWkucHJvbXB0Eg0KC2hlbGxvIHRoZXJlegIYARKSAQoQW47/95gDgQPSabYzgT/GDBIIqqEjRWeJC80iCO7hm37DwbF0KgthaS50b29sQ2FsbDABOQBG4u/lj9cXQQDpwwHmj9cXShoKCXRvb2wubmFtZRINCgtnZXRfd2VhdGhlckojChBhaS50b29sQ2FsbC5hcmdzEg8KDXsiY2l0eSI6IlNGIn16CBIEYm9vbRgC';
 
 const s = (v) => ({ stringValue: v });
 const iv = (v) => ({ intValue: String(v) });
@@ -176,6 +183,34 @@ test('store builds trace summary with counts', () => {
   assert.equal(t.tokens, 12);
 });
 
+// -------------------------------------------------------------- protobuf ---
+test('protobuf OTLP decodes to the same span shape as JSON (golden fixture)', () => {
+  const spans = parseOtlp(decodeTraces(Buffer.from(GOLDEN_PB_B64, 'base64')));
+  assert.equal(spans.length, 2);
+
+  const llm = spans.find((s) => s.name === 'ai.generateText');
+  assert.equal(llm.kind, 'llm');
+  assert.equal(llm.service, 'weather-agent');
+  assert.equal(llm.traceId, '5b8efff798038103d269b633813fc60c');
+  assert.equal(llm.spanId, 'eee19b7ec3c1b174');
+  assert.equal(llm.io.model, 'claude-sonnet-4.5');
+  assert.equal(llm.io.system, 'anthropic');
+  assert.equal(llm.io.input, 'hello there');
+  assert.equal(llm.io.output, 'hi!');
+  assert.deepEqual(llm.tokens, { input: 42, output: 128, total: 170 });
+  assert.equal(llm.durationMs, 1200); // fixed64 nanos decoded with full precision
+  assert.equal(llm.events.length, 1);
+  assert.equal(llm.events[0].name, 'gen_ai.content.prompt');
+
+  const tool = spans.find((s) => s.name === 'ai.toolCall');
+  assert.equal(tool.kind, 'tool');
+  assert.equal(tool.parentSpanId, 'eee19b7ec3c1b174'); // child of the LLM span
+  assert.equal(tool.io.toolName, 'get_weather');
+  assert.equal(tool.io.input, '{"city":"SF"}');
+  assert.equal(tool.status, 'ERROR');
+  assert.equal(tool.statusMessage, 'boom');
+});
+
 // ---------------------------------------------------------------- server ---
 function req(port, method, path, body, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -187,7 +222,7 @@ function req(port, method, path, body, headers = {}) {
       );
     });
     r.on('error', reject);
-    if (body) r.write(typeof body === 'string' ? body : JSON.stringify(body));
+    if (body) r.write(Buffer.isBuffer(body) ? body : typeof body === 'string' ? body : JSON.stringify(body));
     r.end();
   });
 }
@@ -223,9 +258,13 @@ test('HTTP: ingest → list → detail → clear, plus error paths', async (t) =
   const span = detail.spans.find((sp) => sp.spanId === 'r1');
   assert.equal(span.io.input, 'q');
 
-  // protobuf rejected with a helpful 415
-  const pb = await req(PORT, 'POST', '/v1/traces', 'binary', { 'content-type': 'application/x-protobuf' });
-  assert.equal(pb.status, 415);
+  // protobuf OTLP ingests too (the exporter default encoding)
+  const pb = await req(PORT, 'POST', '/v1/traces', Buffer.from(GOLDEN_PB_B64, 'base64'), {
+    'content-type': 'application/x-protobuf',
+  });
+  assert.equal(pb.status, 200);
+  const afterPb = JSON.parse((await req(UI, 'GET', '/api/traces')).body);
+  assert.ok(afterPb.some((t) => t.traceId === '5b8efff798038103d269b633813fc60c'));
 
   // malformed JSON → 400, server stays up
   const bad = await req(PORT, 'POST', '/v1/traces', '{not json', { 'content-type': 'application/json' });

@@ -60,12 +60,11 @@ export function register() {
 ```bash
 # .env.local
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 ```
 
 Set `experimental_telemetry: { isEnabled: true }` on your `generateText` /
 `streamText` calls and you'll see traces in tracelet.
 
-> **JSON, not protobuf.** The MVP ingests OTLP/HTTP **JSON**. Keep
-> `OTEL_EXPORTER_OTLP_PROTOCOL=http/json` (the exporter above already sends JSON
-> by default).
+> **Either encoding works.** tracelet ingests both OTLP/HTTP **protobuf** (the
+> exporter default) and **JSON**, so you don't need to set
+> `OTEL_EXPORTER_OTLP_PROTOCOL` at all.
