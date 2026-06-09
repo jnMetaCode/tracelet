@@ -126,6 +126,14 @@ right now.
 Early MVP. The ingest + live UI work today (`node examples/demo.js` to see it).
 Star/watch to follow along.
 
+## Sibling projects
+
+Part of a small, local-first, zero-dependency toolkit for building AI agents:
+
+- 🔭 **tracelet** — local DevTools to debug agent runs *(this repo)*
+- 🍳 **[skillet](https://github.com/USER/skillet)** — a package manager for agent skills
+- 🧠 **[engram](https://github.com/USER/engram)** — a local, private memory layer for agents (and you)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
