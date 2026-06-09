@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { gzipSync } from 'node:zlib';
 import { parseOtlp } from '../src/otlp.js';
 import { decodeTraces } from '../src/otlp-protobuf.js';
 import { store } from '../src/store.js';
@@ -211,6 +212,23 @@ test('protobuf OTLP decodes to the same span shape as JSON (golden fixture)', ()
   assert.equal(tool.statusMessage, 'boom');
 });
 
+test('spans without timestamps do not flatten the trace window', () => {
+  store.clear();
+  const tid = 'dddddddddddddddddddddddddddddddd';
+  store.addSpans(
+    parseOtlp(
+      envelope([
+        baseSpan({ traceId: tid, spanId: 't1', startTimeUnixNano: '1718000000000000000', endTimeUnixNano: '1718000001000000000' }),
+        baseSpan({ traceId: tid, spanId: 't2', startTimeUnixNano: '', endTimeUnixNano: '' }), // no times
+      ])
+    )
+  );
+  const sum = store.list().find((t) => t.traceId === tid);
+  assert.equal(sum.start, 1718000000000); // the finite span's start, NOT 0
+  assert.equal(sum.durationMs, 1000);
+  store.clear();
+});
+
 // ---------------------------------------------------------------- server ---
 function req(port, method, path, body, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -283,6 +301,26 @@ test('HTTP: ingest → list → detail → clear, plus error paths', async (t) =
   await req(UI, 'POST', '/api/clear');
   const after = JSON.parse((await req(UI, 'GET', '/api/traces')).body);
   assert.equal(after.length, 0);
+});
+
+test('HTTP: gzip-compressed OTLP ingests', async (t) => {
+  const PORT = 4377;
+  const UI = 4380;
+  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => {
+    ingest.close();
+    ui.close();
+  });
+  const tid = 'ee'.repeat(16);
+  const body = gzipSync(Buffer.from(JSON.stringify(envelope([baseSpan({ traceId: tid, spanId: 'g1' })]))));
+  const r = await req(PORT, 'POST', '/v1/traces', body, {
+    'content-type': 'application/json',
+    'content-encoding': 'gzip',
+  });
+  assert.equal(r.status, 200);
+  const list = JSON.parse((await req(UI, 'GET', '/api/traces')).body);
+  assert.ok(list.some((t) => t.traceId === tid));
 });
 
 test('HTTP: SSE pushes a live event on ingest', async (t) => {

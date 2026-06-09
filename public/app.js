@@ -94,7 +94,8 @@ function renderTree() {
     const right = el('div');
     const wrap = el('div', 'bar-wrap');
     const bar = el('div', `bar ${s.kind}` + (s.status === 'ERROR' ? ' err' : ''));
-    bar.style.left = `${((s.start - t0) / span) * 100}%`;
+    const left = Number.isFinite(s.start) ? ((s.start - t0) / span) * 100 : 0;
+    bar.style.left = `${left}%`;
     bar.style.width = `${Math.max(1, (s.durationMs / span) * 100)}%`;
     bar.title = fmtMs(s.durationMs);
     wrap.appendChild(bar);

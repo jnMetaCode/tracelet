@@ -29,7 +29,7 @@ function attrsToObject(attrs) {
 // Convert a nanosecond unix timestamp string to float milliseconds without
 // losing precision through Number() (nanos overflow 2^53).
 function nanoToMs(nanos) {
-  if (nanos == null) return 0;
+  if (nanos == null || nanos === '') return NaN; // absent timestamp — caller must not treat as 0
   try {
     return Number(BigInt(nanos) / 1000n) / 1000;
   } catch {
@@ -167,6 +167,7 @@ export function parseOtlp(body) {
         const attrs = attrsToObject(sp.attributes);
         const start = nanoToMs(sp.startTimeUnixNano);
         const end = nanoToMs(sp.endTimeUnixNano);
+        const hasTimes = Number.isFinite(start) && Number.isFinite(end);
         const kind = detectKind(sp.name, attrs);
         const statusCode = sp.status?.code; // 0 UNSET, 1 OK, 2 ERROR
         out.push({
@@ -180,7 +181,7 @@ export function parseOtlp(body) {
           kind, // semantic: llm | tool | chain | retriever | agent | embedding | span
           start,
           end,
-          durationMs: Math.max(0, end - start),
+          durationMs: hasTimes ? Math.max(0, end - start) : 0,
           status: statusCode === 2 ? 'ERROR' : statusCode === 1 ? 'OK' : 'UNSET',
           statusMessage: sp.status?.message || '',
           tokens: extractTokens(attrs),

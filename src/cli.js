@@ -50,4 +50,14 @@ if (args.version) {
   process.exit(0);
 }
 
+const validPort = (p) => Number.isInteger(p) && p >= 0 && p <= 65535;
+if (!validPort(args.port) || !validPort(args.uiPort)) {
+  console.error('Error: --port and --ui-port must be integers in 0–65535');
+  process.exit(1);
+}
+if (args.port === args.uiPort) {
+  console.error('Error: --port and --ui-port must differ (ingest and UI use separate ports)');
+  process.exit(1);
+}
+
 startServer(args);

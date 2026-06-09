@@ -19,8 +19,8 @@ class Store {
         trace = {
           traceId: span.traceId,
           spans: new Map(),
-          start: span.start,
-          end: span.end,
+          start: Infinity,
+          end: -Infinity,
           name: span.name,
         };
         this.traces.set(span.traceId, trace);
@@ -28,8 +28,10 @@ class Store {
         this._evict();
       }
       trace.spans.set(span.spanId, span);
-      trace.start = Math.min(trace.start, span.start);
-      trace.end = Math.max(trace.end, span.end);
+      // Only fold in finite timestamps — a span with no times must not pin the
+      // trace window to epoch 0 and flatten the whole waterfall.
+      if (Number.isFinite(span.start)) trace.start = Math.min(trace.start, span.start);
+      if (Number.isFinite(span.end)) trace.end = Math.max(trace.end, span.end);
       // The root span (no parent) names the trace.
       if (!span.parentSpanId) trace.name = span.name;
       touched.add(span.traceId);
@@ -48,13 +50,14 @@ class Store {
     const t = this.traces.get(traceId);
     if (!t) return null;
     const spans = [...t.spans.values()];
+    const bounded = Number.isFinite(t.start) && Number.isFinite(t.end);
     return {
       type: 'trace',
       traceId: t.traceId,
       name: t.name,
-      start: t.start,
-      end: t.end,
-      durationMs: t.end - t.start,
+      start: bounded ? t.start : 0,
+      end: bounded ? t.end : 0,
+      durationMs: bounded ? t.end - t.start : 0,
       spanCount: spans.length,
       errorCount: spans.filter((s) => s.status === 'ERROR').length,
       llmCalls: spans.filter((s) => s.kind === 'llm').length,

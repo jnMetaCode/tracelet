@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { gunzipSync, inflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize } from 'node:path';
 import { store } from './store.js';
@@ -48,8 +49,12 @@ function send(res, code, body, type = 'application/json') {
 // ---- OTLP ingest handler (shared by ingest + UI servers) -----------------
 async function handleTraces(req, res) {
   try {
-    const buf = await readBody(req);
+    let buf = await readBody(req);
     const ct = req.headers['content-type'] || '';
+    // OTel exporters / the Collector commonly gzip the body — decompress first.
+    const enc = (req.headers['content-encoding'] || '').toLowerCase();
+    if (enc.includes('gzip')) buf = gunzipSync(buf);
+    else if (enc.includes('deflate')) buf = inflateSync(buf);
     // Accept both OTLP/HTTP encodings: protobuf (the exporter default) and JSON.
     const json = ct.includes('protobuf') ? decodeTraces(buf) : JSON.parse(buf.toString('utf8') || '{}');
     const spans = parseOtlp(json);
