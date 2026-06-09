@@ -1,0 +1,38 @@
+{
+  "name": "tracelet",
+  "version": "0.1.0",
+  "description": "Local-first DevTools for AI agents. See every tool call, prompt, and token — 100% on your machine. Zero cloud, zero signup, one command.",
+  "type": "module",
+  "bin": {
+    "tracelet": "./src/cli.js"
+  },
+  "main": "./src/server.js",
+  "scripts": {
+    "start": "node src/cli.js",
+    "dev": "node src/cli.js --port 4318"
+  },
+  "files": [
+    "src",
+    "public",
+    "README.md"
+  ],
+  "keywords": [
+    "ai",
+    "agents",
+    "observability",
+    "opentelemetry",
+    "otel",
+    "tracing",
+    "llm",
+    "devtools",
+    "local-first",
+    "debugging",
+    "langchain",
+    "vercel-ai-sdk"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {}
+}

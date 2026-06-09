@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tracelet — local DevTools for AI agents</title>
+    <link rel="stylesheet" href="/style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🔭</text></svg>"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">🔭</span>
+        <span class="name">tracelet</span>
+        <span class="tag">local DevTools for AI agents</span>
+      </div>
+      <div class="status">
+        <span id="live" class="live off">● offline</span>
+        <button id="clear" class="btn" title="Clear all traces">Clear</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="pane traces">
+        <div class="pane-head">
+          Traces <span id="trace-count" class="muted"></span>
+        </div>
+        <ul id="trace-list" class="trace-list"></ul>
+        <div id="empty" class="empty">
+          <p>Waiting for traces…</p>
+          <code>http://localhost:4318/v1/traces</code>
+          <p class="muted small">
+            Point any OpenTelemetry exporter here. Nothing leaves this machine.
+          </p>
+        </div>
+      </aside>
+
+      <section class="pane waterfall">
+        <div class="pane-head" id="trace-title">Select a trace</div>
+        <div id="tree" class="tree"></div>
+      </section>
+
+      <aside class="pane detail">
+        <div class="pane-head">Span</div>
+        <div id="detail" class="detail">
+          <p class="muted">Select a span to inspect its prompt, response, tokens and attributes.</p>
+        </div>
+      </aside>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
