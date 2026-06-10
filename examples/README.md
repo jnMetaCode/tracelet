@@ -31,6 +31,8 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
 - **Vercel AI SDK** — set `experimental_telemetry: { isEnabled: true }` and export
   OTLP. Full walkthrough: [`vercel-ai-sdk.md`](vercel-ai-sdk.md).
+- **Python** (LangChain, CrewAI, OpenAI Agents SDK, hand-rolled) — the standard
+  OTel Python SDK works as-is, protobuf and all: [`python-opentelemetry.md`](python-opentelemetry.md).
 - **OpenInference** (LangChain, LlamaIndex, CrewAI, Mastra…) — any OpenInference
   instrumentor exporting OTLP renders with full semantic enrichment.
 - **Raw OpenTelemetry** — plain `gen_ai.*` spans render too.

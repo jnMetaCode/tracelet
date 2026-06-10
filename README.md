@@ -62,6 +62,7 @@ tracelet speaks the three common tracing vocabularies on the same spans, so it
 | Source | How |
 | --- | --- |
 | **Vercel AI SDK** | `experimental_telemetry: { isEnabled: true }` → export OTLP to `localhost:4318`. See [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md). |
+| **Python OTel SDK** (LangChain, CrewAI, OpenAI Agents SDK…) | The standard exporter works as-is (protobuf included). See [`examples/python-opentelemetry`](examples/python-opentelemetry.md). |
 | **OpenInference** (LangChain, LlamaIndex, CrewAI, Mastra…) | Any OpenInference instrumentor exporting OTLP. |
 | **OpenTelemetry GenAI** semconv | Native `gen_ai.*` spans, content as attributes *or* events. |
 | **Anything OTel** | Plain spans render too — you just get less semantic enrichment. |
