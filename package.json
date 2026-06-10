@@ -15,11 +15,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/USER/tracelet.git"
+    "url": "https://github.com/jnMetaCode/tracelet.git"
   },
-  "homepage": "https://github.com/USER/tracelet#readme",
+  "homepage": "https://github.com/jnMetaCode/tracelet#readme",
   "bugs": {
-    "url": "https://github.com/USER/tracelet/issues"
+    "url": "https://github.com/jnMetaCode/tracelet/issues"
   },
   "files": [
     "src",

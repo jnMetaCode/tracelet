@@ -133,8 +133,8 @@ Star/watch to follow along.
 Part of a small, local-first, zero-dependency toolkit for building AI agents:
 
 - 🔭 **tracelet** — local DevTools to debug agent runs *(this repo)*
-- 🍳 **[skillet](https://github.com/USER/skillet)** — a package manager for agent skills
-- 🧠 **[engram](https://github.com/USER/engram)** — a local, private memory layer for agents (and you)
+- 🍳 **[skillet](https://github.com/jnMetaCode/skillet)** — a package manager for agent skills
+- 🧠 **[engram](https://github.com/jnMetaCode/engram)** — a local, private memory layer for agents (and you)
 
 ## License
 
