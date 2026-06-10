@@ -1,0 +1,23 @@
+name: Bug report
+description: Something broke or behaved wrong
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: What happened
+      description: What did you run, what did you expect, what did you get?
+      placeholder: |
+        $ tracelet "..."
+        expected: ... / got: ...
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Version & platform
+      placeholder: "tracelet 0.1.0 · node 22 · macOS 14"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: A file or snippet that reproduces it
+      description: For ingest issues, which SDK/exporter emitted the trace and a sample OTLP payload (JSON export) is gold.
