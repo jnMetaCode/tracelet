@@ -53,19 +53,39 @@ Keep it under 25s, no narration, loop-friendly. Tools: Kap / QuickTime + Gifski.
 > When you outgrow it, everything is standard OTLP so you graduate to Langfuse /
 > Phoenix / Laminar without re-instrumenting.
 >
-> Repo: <link>. It's an early MVP — `node examples/demo.js` shows it without
-> wiring a real agent. Would love feedback on the convention coverage.
+> Repo: https://github.com/jnMetaCode/tracelet. It's an early MVP —
+> `node examples/demo.js` shows it without wiring a real agent (Python users:
+> `examples/python-opentelemetry.md` is a verified walkthrough). Would love
+> feedback on the convention coverage.
 
 Post Tue/Wed ~8:00am PT. Reply to every comment for the first 3 hours.
 
-## Other channels
+## Other channels — ready-to-paste drafts
 
-- **r/LocalLLaMA**, **r/LangChain** — lead with the GIF, not the pitch.
-- **X/Twitter** — short thread; tag the Vercel AI SDK + OpenTelemetry communities.
-- **dev.to / Hashnode** — "I built a zero-dependency local tracer for AI agents"
-  walkthrough that doubles as SEO.
-- **GitHub topics**: `ai-agents`, `observability`, `opentelemetry`, `llm`,
-  `devtools`, `local-first`.
+**r/LocalLLaMA / r/LangChain** (lead with the GIF, 1–2 days after HN):
+
+> **Title:** tracelet: a local OTLP viewer for AI agents — see every LLM/tool call live, zero deps, no account, `npx` one-liner
+>
+> Debugging agents by console.log-ing prompts got old. tracelet is the Network
+> tab for agent runs: `npx @jnmetacode/tracelet`, point any OpenTelemetry exporter at
+> localhost:4318, and the execution tree streams in live — prompts, completions,
+> token counts, latency, the tool call that errored. Both OTLP protobuf (the
+> SDK default) and JSON work; it reads OTel gen_ai.*, Vercel AI SDK ai.*, and
+> OpenInference conventions, so LangChain / LlamaIndex / Vercel AI SDK work
+> without a tracelet SDK. In-memory ring buffer, nothing written or sent
+> anywhere. Repo: https://github.com/jnMetaCode/tracelet
+> (Python: there's a verified OTel-SDK walkthrough in examples/.)
+
+**X thread**: 1/ "your agent is a black box; here's the Network tab for it"
+[GIF] · 2/ any OTel exporter → localhost:4318, protobuf included, no SDK to
+adopt · 3/ prompts/tokens/errors in the inspector, 100% local ring buffer ·
+4/ outgrow it → it's standard OTLP, graduate to Langfuse/Phoenix without
+re-instrumenting. Tag the Vercel AI SDK + OpenTelemetry communities.
+
+**dev.to / Hashnode** — "I built a zero-dependency local tracer for AI agents"
+walkthrough that doubles as SEO.
+**GitHub topics** (already set): `ai-agents`, `observability`, `opentelemetry`,
+`llm`, `devtools`, `local-first`.
 
 ## After traction
 
