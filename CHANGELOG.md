@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-11
+### Added
+- **Cost estimates** — traces and LLM spans show a `~$` figure computed from
+  published list prices (Claude/GPT/Gemini families); unknown models show
+  nothing rather than a guess.
+- **Opt-in local history** — `--persist <file>` appends traces to a local
+  JSONL file and restores them on start; `Clear` wipes the file too. The
+  default remains pure in-memory.
+
 ## [0.1.1] - 2026-06-11
 ### Fixed
 - The demo GIF and the 中文 README link now render on the npm package page
@@ -28,6 +37,7 @@ First public release.
 - Verified walkthroughs for the Vercel AI SDK and the Python OpenTelemetry
   SDK (`examples/`).
 
-[Unreleased]: https://github.com/jnMetaCode/tracelet/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/jnMetaCode/tracelet/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jnMetaCode/tracelet/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jnMetaCode/tracelet/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jnMetaCode/tracelet/releases/tag/v0.1.0
