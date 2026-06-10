@@ -115,7 +115,8 @@ function handleUi(req, res) {
   return send(res, 405, { error: 'method not allowed' });
 }
 
-export function startServer({ port = 4318, uiPort = 4321, open = true } = {}) {
+export function startServer({ port = 4318, uiPort = 4321, open = true, persist = null } = {}) {
+  if (persist) store.enablePersist(persist);
   // Ingest server: bare OTLP endpoint on the conventional 4318.
   const ingest = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -133,6 +134,10 @@ export function startServer({ port = 4318, uiPort = 4321, open = true } = {}) {
       console.log(`  ▸ OTLP ingest   http://localhost:${port}/v1/traces`);
       console.log(`  ▸ Web UI        ${uiUrl}\n`);
       console.log(`  Point your agent's OTel exporter at the ingest URL above.`);
+      if (persist) {
+        const n = store.loadedBatches || 0;
+        console.log(`  ▸ History       ${persist}${n ? ` (restored ${n} batch${n === 1 ? '' : 'es'})` : ''}`);
+      }
       console.log(`  Nothing leaves this machine.\n`);
       if (open) openBrowser(uiUrl);
     });

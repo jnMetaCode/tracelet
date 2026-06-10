@@ -355,3 +355,75 @@ test('HTTP: SSE pushes a live event on ingest', async (t) => {
   });
   assert.equal(await got, true);
 });
+
+// ---- cost estimates --------------------------------------------------------
+test('estimateCost: longest-prefix model matching, provider prefixes, unknowns', async () => {
+  const { estimateCost } = await import('../src/cost.js');
+  // claude-sonnet-4-6: $3/MTok in, $15/MTok out
+  assert.equal(estimateCost('claude-sonnet-4-6', 1_000_000, 0), 3);
+  assert.equal(estimateCost('claude-sonnet-4-6', 0, 1_000_000), 15);
+  // longest prefix wins: opus-4-8 is $5/$25, generic old opus is $15/$75
+  assert.equal(estimateCost('claude-opus-4-8', 1_000_000, 0), 5);
+  assert.equal(estimateCost('claude-opus-4-1-20250805', 1_000_000, 0), 15);
+  // provider prefixes are stripped
+  assert.equal(estimateCost('anthropic.claude-haiku-4-5', 1_000_000, 0), 1);
+  assert.equal(estimateCost('us.anthropic.claude-sonnet-4-6', 1_000_000, 0), 3);
+  // unknown models get no estimate, never a guess
+  assert.equal(estimateCost('mystery-model-9000', 1_000_000, 0), null);
+  assert.equal(estimateCost('', 10, 10), null);
+});
+
+test('trace summary carries a cost estimate for known models only', async () => {
+  const fs = await import('node:fs');
+  void fs;
+  store.clear();
+  store.addSpans(parseOtlp({
+    resourceSpans: [{ scopeSpans: [{ spans: [{
+      traceId: 'c0'.repeat(16), spanId: 'd0'.repeat(8), name: 'ai.generateText',
+      startTimeUnixNano: '1781100000000000000', endTimeUnixNano: '1781100001000000000',
+      attributes: [
+        { key: 'gen_ai.request.model', value: { stringValue: 'claude-sonnet-4-6' } },
+        { key: 'gen_ai.usage.input_tokens', value: { intValue: 1000 } },
+        { key: 'gen_ai.usage.output_tokens', value: { intValue: 500 } },
+      ],
+    }] }] }],
+  }));
+  const s = store.summary('c0'.repeat(16));
+  // 1000 * $3/M + 500 * $15/M = 0.003 + 0.0075 = 0.0105
+  assert.ok(Math.abs(s.costUsd - 0.0105) < 1e-9, String(s.costUsd));
+  const d = store.detail('c0'.repeat(16));
+  assert.ok(Math.abs(d.spans[0].costUsd - 0.0105) < 1e-9);
+  store.clear();
+});
+
+// ---- persistence -----------------------------------------------------------
+test('--persist: spans survive a store restart via the JSONL file', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tracelet-')), 'traces.jsonl');
+
+  store.clear();
+  store.enablePersist(file);
+  store.addSpans(parseOtlp({
+    resourceSpans: [{ scopeSpans: [{ spans: [{
+      traceId: 'e0'.repeat(16), spanId: 'f0'.repeat(8), name: 'persisted.run',
+      startTimeUnixNano: '1781100000000000000', endTimeUnixNano: '1781100001000000000',
+    }] }] }],
+  }));
+  assert.ok(fs.readFileSync(file, 'utf8').includes('persisted.run'));
+
+  // simulate restart: wipe memory (not the file), then re-enable
+  store.persistFile = null;
+  store.traces.clear();
+  store.order = [];
+  store.enablePersist(file);
+  const restored = store.list().find((t) => t.name === 'persisted.run');
+  assert.ok(restored, 'trace restored from JSONL');
+
+  // clear() forgets on disk too
+  store.clear();
+  assert.equal(fs.readFileSync(file, 'utf8'), '');
+  store.persistFile = null;
+  fs.rmSync(path.dirname(file), { recursive: true, force: true });
+});

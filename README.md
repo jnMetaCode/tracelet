@@ -101,8 +101,12 @@ your agent ──OTLP/HTTP (pb|json)──▶  :4318  ──▶  in-memory store
 - **Zero dependencies.** Pure Node built-ins. The whole thing is a few hundred
   lines you can read.
 - **Two ports.** `4318` ingests OTLP (the convention), `4321` serves the UI.
-- **In-memory ring buffer.** Last 500 traces. Restart = clean slate. Your
-  prompts and data are never written to disk or sent anywhere.
+- **In-memory ring buffer.** Last 500 traces. Restart = clean slate — unless
+  you opt in to `--persist <file>`, which keeps history in a local JSONL file
+  (still your disk, still nothing sent anywhere; Clear wipes it too).
+- **Cost estimates.** Traces and LLM spans show a `~$` figure computed from
+  published list prices for common models (Claude/GPT/Gemini); unknown models
+  simply show none — it never guesses.
 
 ## CLI
 
@@ -110,14 +114,15 @@ your agent ──OTLP/HTTP (pb|json)──▶  :4318  ──▶  in-memory store
 npx @jnmetacode/tracelet [options]
   -p, --port <n>      OTLP/HTTP ingest port   (default 4318)
       --ui-port <n>   Web UI port             (default 4321)
+      --persist <f>   opt-in local history (JSONL; reloaded on start)
       --no-open       don't auto-open browser
 ```
 
 ## Roadmap
 
-- [ ] Persist option (`--db traces.sqlite`) for opt-in local history
+- [x] Opt-in local history (`--persist traces.jsonl`) — done
 - [ ] Diff two runs side by side
-- [ ] Cost estimates per model
+- [x] Cost estimates per model (list-price `~$` on traces and LLM spans) — done
 - [x] protobuf OTLP ingest (zero-dep decoder) — done
 - [ ] Waterfall flamegraph zoom
 - [ ] One-line wrappers: `tracelet/vercel`, `tracelet/langchain`

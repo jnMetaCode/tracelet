@@ -11,6 +11,9 @@ const state = { traces: [], selected: null, detail: null, selectedSpan: null };
 
 const fmtMs = (ms) => (ms < 1 ? '<1ms' : ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`);
 const fmtNum = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
+// List-price estimate computed server-side (src/cost.js); "~" marks it as such.
+const fmtCost = (usd) =>
+  usd == null ? '' : usd >= 0.1 ? `~$${usd.toFixed(2)}` : usd >= 0.001 ? `~$${usd.toFixed(4)}` : `~$${usd.toFixed(6)}`;
 
 async function api(path, opts) {
   const r = await fetch(path, opts);
@@ -33,6 +36,7 @@ function renderList() {
     if (t.llmCalls) meta.appendChild(el('span', null, `${t.llmCalls} LLM`));
     if (t.toolCalls) meta.appendChild(el('span', null, `${t.toolCalls} tool`));
     if (t.tokens) meta.appendChild(el('span', null, `${fmtNum(t.tokens)} tok`));
+    if (t.costUsd != null) meta.appendChild(el('span', null, fmtCost(t.costUsd)));
     li.appendChild(meta);
     li.onclick = () => selectTrace(t.traceId);
     list.appendChild(li);
@@ -75,7 +79,12 @@ function renderTree() {
   title.innerHTML = '';
   title.appendChild(el('span', null, d.name || d.traceId.slice(0, 16)));
   title.appendChild(
-    el('span', 'muted small', `${d.spanCount} spans · ${fmtMs(d.durationMs)} · ${fmtNum(d.tokens)} tok`)
+    el(
+      'span',
+      'muted small',
+      `${d.spanCount} spans · ${fmtMs(d.durationMs)} · ${fmtNum(d.tokens)} tok` +
+        (d.costUsd != null ? ` · ${fmtCost(d.costUsd)}` : '')
+    )
   );
 
   const t0 = d.start;
@@ -149,6 +158,7 @@ function renderDetail(s) {
     chip('out', fmtNum(s.tokens.output));
     chip('total', fmtNum(s.tokens.total));
   }
+  if (s.costUsd != null) chip('cost', fmtCost(s.costUsd));
   if (chips.children.length) d.appendChild(chips);
 
   const section = (title, content, cls = 'block io') => {

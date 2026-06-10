@@ -7,6 +7,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === '--port' || a === '-p') args.port = Number(argv[++i]);
     else if (a === '--ui-port') args.uiPort = Number(argv[++i]);
+    else if (a === '--persist') args.persist = argv[++i];
     else if (a === '--no-open') args.open = false;
     else if (a === '--help' || a === '-h') args.help = true;
     else if (a === '--version' || a === '-v') args.version = true;
@@ -23,6 +24,8 @@ Usage:
 Options:
   -p, --port <n>      OTLP/HTTP ingest port (default: 4318)
       --ui-port <n>   Web UI port (default: 4321)
+      --persist <f>   Opt-in local history: append traces to a JSONL file and
+                      reload it on start (default: in-memory only)
       --no-open       Do not auto-open the browser
   -h, --help          Show this help
   -v, --version       Show version
