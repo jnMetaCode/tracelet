@@ -11,9 +11,9 @@ No account. No Docker. No Python. Just `npx @jnmetacode/tracelet`.
 npx @jnmetacode/tracelet
 ```
 
-English | [简体中文](./README.zh-CN.md)
+English | [简体中文](https://github.com/jnMetaCode/tracelet/blob/main/README.zh-CN.md)
 
-![tracelet demo — a live agent trace streams in; inspect the LLM call (prompt, tokens) and the errored tool call](docs/demo.gif)
+![tracelet demo — a live agent trace streams in; inspect the LLM call (prompt, tokens) and the errored tool call](https://raw.githubusercontent.com/jnMetaCode/tracelet/main/docs/demo.gif)
 
 </div>
 

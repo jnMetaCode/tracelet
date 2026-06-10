@@ -1,6 +1,6 @@
 {
   "name": "@jnmetacode/tracelet",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first DevTools for AI agents. See every tool call, prompt, and token — 100% on your machine. Zero cloud, zero signup, one command.",
   "type": "module",
   "bin": {
