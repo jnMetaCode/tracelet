@@ -1,5 +1,7 @@
 # Launch playbook (internal)
 
+English | [简体中文](./LAUNCH.zh-CN.md)
+
 Everything below is the go-to-market checklist for tracelet. Delete this file
 (or move it out of the repo) before/after launch as you prefer.
 
