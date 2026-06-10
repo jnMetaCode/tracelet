@@ -14,8 +14,10 @@ Everything below is the go-to-market checklist for tracelet. Delete this file
 - [x] Record the hero GIF (script below) → `docs/demo.gif`, linked in README.
       *(done — terminal opener via vhs `docs/demo-term.tape`, UI segment via
       Playwright `docs/record-ui.mjs`, concatenated with ffmpeg)*
-- [ ] Add `NPM_TOKEN` repo secret; `git tag v0.1.0 && git push --tags` to publish.
-- [ ] Verify `npx @jnmetacode/tracelet` works from a clean machine (no global install).
+- [x] **Published**: `@jnmetacode/tracelet` live on npm (v0.1.0, tag + release).
+      Clean-cache `npx @jnmetacode/tracelet` verified. *(done; `NPM_TOKEN` secret
+      still optional, for future CI publishes)*
+- [x] Verified from a clean npm cache: `npx @jnmetacode/tracelet` runs. *(done)*
 
 ## Hero GIF script (15–25s) — this is the single highest-leverage asset
 
