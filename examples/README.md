@@ -8,7 +8,7 @@ calls, tool calls, prompts, tokens, latency, errors — in a clean local UI.
 
 ```bash
 # terminal 1 — start tracelet (UI opens at http://localhost:4321)
-npx tracelet
+npx @jnmetacode/tracelet
 
 # terminal 2 — send a synthetic multi-span agent trace
 node examples/demo.js

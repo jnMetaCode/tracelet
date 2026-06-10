@@ -5,7 +5,7 @@ keep it that way.
 
 ## Ground rules
 
-- **No runtime dependencies.** The whole point is `npx tracelet` with nothing to
+- **No runtime dependencies.** The whole point is `npx @jnmetacode/tracelet` with nothing to
   install. Dev/test tooling that ships in `devDependencies` is fine; anything in
   `dependencies` will be rejected unless there's a very strong reason.
 - **Node built-ins only** in `src/`. Target Node 18+.

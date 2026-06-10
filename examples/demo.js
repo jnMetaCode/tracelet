@@ -2,7 +2,7 @@
 // Send a realistic synthetic agent trace to Tracelet so you can see the UI
 // without wiring up a real agent. Zero dependencies (Node 18+ global fetch).
 //
-//   1. npx tracelet            # in one terminal
+//   1. npx @jnmetacode/tracelet            # in one terminal
 //   2. node examples/demo.js   # in another
 //
 // Then watch the trace stream into http://localhost:4321
@@ -133,7 +133,7 @@ const res = await fetch(ENDPOINT, {
   body: JSON.stringify(payload),
 }).catch((e) => {
   console.error(`\n✖ Could not reach Tracelet at ${ENDPOINT}`);
-  console.error(`  Is it running? Start it with:  npx tracelet\n`);
+  console.error(`  Is it running? Start it with:  npx @jnmetacode/tracelet\n`);
   console.error(`  (${e.message})`);
   process.exit(1);
 });

@@ -5,10 +5,10 @@
 ### Local-first DevTools for AI agents
 
 **See every tool call, prompt, and token — live, 100% on your machine.**
-No account. No Docker. No Python. Just `npx tracelet`.
+No account. No Docker. No Python. Just `npx @jnmetacode/tracelet`.
 
 ```bash
-npx tracelet
+npx @jnmetacode/tracelet
 ```
 
 <!-- TODO: replace with a real screen recording before launch -->
@@ -33,10 +33,10 @@ Nothing ever leaves your machine.
 
 ```bash
 # 1. Start tracelet (opens http://localhost:4321)
-npx tracelet
+npx @jnmetacode/tracelet
 
 # 2. See it work with a synthetic agent trace
-npx tracelet & sleep 1 && node examples/demo.js
+npx @jnmetacode/tracelet & sleep 1 && node examples/demo.js
 ```
 
 Then point your real agent's OpenTelemetry exporter at the ingest endpoint:
@@ -105,7 +105,7 @@ your agent ──OTLP/HTTP (pb|json)──▶  :4318  ──▶  in-memory store
 ## CLI
 
 ```
-npx tracelet [options]
+npx @jnmetacode/tracelet [options]
   -p, --port <n>      OTLP/HTTP ingest port   (default 4318)
       --ui-port <n>   Web UI port             (default 4321)
       --no-open       don't auto-open browser

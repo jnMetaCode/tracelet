@@ -38,7 +38,7 @@ const { text } = await generateText({
 });
 ```
 
-Run tracelet in one terminal (`npx tracelet`), your app in another, and the
+Run tracelet in one terminal (`npx @jnmetacode/tracelet`), your app in another, and the
 `ai.generateText` / `ai.toolCall` spans stream into the UI live.
 
 ## Next.js

@@ -5,17 +5,20 @@ Everything below is the go-to-market checklist for tracelet. Delete this file
 
 ## Pre-flight checklist
 
-- [ ] Replace `USER` in `package.json` + docs with the real GitHub org/user.
-- [ ] Confirm the npm name `tracelet` is available (`npm view tracelet`); pick a
-      fallback if not (`tracelet-dev`, `agent-tracelet`, `lookglass`).
+- [x] Replace `USER` in `package.json` + docs with the real GitHub org/user
+      → **jnMetaCode**. *(done)*
+- [x] **npm name decided → `@jnmetacode/tracelet`** (unscoped `tracelet` is taken;
+      scoped keeps the brand, bin stays `tracelet`). Claim the `jnmetacode` npm
+      username/org before publishing — see engram's `docs/LAUNCH.md` for the
+      scope-claim steps. *(name set in package.json + docs)*
 - [ ] Record the hero GIF (script below) → `docs/demo.gif`, uncomment it in README.
 - [ ] Add `NPM_TOKEN` repo secret; `git tag v0.1.0 && git push --tags` to publish.
-- [ ] Verify `npx tracelet` works from a clean machine (no global install).
+- [ ] Verify `npx @jnmetacode/tracelet` works from a clean machine (no global install).
 
 ## Hero GIF script (15–25s) — this is the single highest-leverage asset
 
 1. Split screen: terminal (left), browser (right).
-2. Terminal: type `npx tracelet` → UI opens, "Waiting for traces…".
+2. Terminal: type `npx @jnmetacode/tracelet` → UI opens, "Waiting for traces…".
 3. Terminal: `node examples/demo.js` → trace **streams in live**.
 4. Click the LLM span → prompt + completion + tokens appear in the inspector.
 5. Click the red (errored) tool span → error banner + args.
@@ -33,7 +36,7 @@ Keep it under 25s, no narration, loop-friendly. Tools: Kap / QuickTime + Gifski.
 > which tool call went wrong. Hosted tracing tools felt like overkill for the
 > inner dev loop — sign up, install an SDK, ship my prompts to someone's cloud.
 >
-> Tracelet is the opposite: `npx tracelet`, point any OpenTelemetry exporter at
+> Tracelet is the opposite: `npx @jnmetacode/tracelet`, point any OpenTelemetry exporter at
 > `localhost:4318`, and watch your agent's execution tree stream in live — LLM
 > calls, tool calls, prompts in, completions out, tokens, latency, errors. Zero
 > dependencies (pure Node built-ins), no account, no Docker, no Python. Nothing

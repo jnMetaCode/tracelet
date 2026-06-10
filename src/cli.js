@@ -18,7 +18,7 @@ const HELP = `
 tracelet — local-first DevTools for AI agents
 
 Usage:
-  npx tracelet [options]
+  npx @jnmetacode/tracelet [options]
 
 Options:
   -p, --port <n>      OTLP/HTTP ingest port (default: 4318)
