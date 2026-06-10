@@ -11,8 +11,7 @@ No account. No Docker. No Python. Just `npx @jnmetacode/tracelet`.
 npx @jnmetacode/tracelet
 ```
 
-<!-- TODO: replace with a real screen recording before launch -->
-<!-- ![tracelet demo](docs/demo.gif) -->
+![tracelet demo — a live agent trace streams in; inspect the LLM call (prompt, tokens) and the errored tool call](docs/demo.gif)
 
 </div>
 

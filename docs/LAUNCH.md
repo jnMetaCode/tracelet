@@ -11,7 +11,9 @@ Everything below is the go-to-market checklist for tracelet. Delete this file
       scoped keeps the brand, bin stays `tracelet`). Claim the `jnmetacode` npm
       username/org before publishing — see engram's `docs/LAUNCH.md` for the
       scope-claim steps. *(name set in package.json + docs)*
-- [ ] Record the hero GIF (script below) → `docs/demo.gif`, uncomment it in README.
+- [x] Record the hero GIF (script below) → `docs/demo.gif`, linked in README.
+      *(done — terminal opener via vhs `docs/demo-term.tape`, UI segment via
+      Playwright `docs/record-ui.mjs`, concatenated with ffmpeg)*
 - [ ] Add `NPM_TOKEN` repo secret; `git tag v0.1.0 && git push --tags` to publish.
 - [ ] Verify `npx @jnmetacode/tracelet` works from a clean machine (no global install).
 
