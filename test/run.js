@@ -427,3 +427,48 @@ test('--persist: spans survive a store restart via the JSONL file', async () => 
   store.persistFile = null;
   fs.rmSync(path.dirname(file), { recursive: true, force: true });
 });
+
+// ---- review-pass regressions (0.2.1) ---------------------------------------
+test('cost: regional/long provider prefixes strip; total-only spans price as unknown', async () => {
+  const { estimateCost } = await import('../src/cost.js');
+  assert.equal(estimateCost('apac.anthropic.claude-sonnet-4-6', 1_000_000, 0), 3);
+  assert.equal(estimateCost('global.anthropic.claude-haiku-4-5', 1_000_000, 0), 1);
+  assert.equal(estimateCost('us-gov.anthropic.claude-sonnet-4-6', 0, 1_000_000), 15);
+  // string-typed counts coerce instead of concatenating
+  assert.equal(estimateCost('claude-sonnet-4-6', '1000000', '0'), 3);
+  // no usable in/out counts -> unknown, never a fake $0
+  assert.equal(estimateCost('claude-sonnet-4-6', 0, 0), null);
+  assert.equal(estimateCost('claude-sonnet-4-6', undefined, undefined), null);
+});
+
+test('string token attributes never corrupt the trace token sum', () => {
+  store.clear();
+  store.addSpans(parseOtlp({
+    resourceSpans: [{ scopeSpans: [{ spans: [
+      { traceId: 'aa'.repeat(16), spanId: '01'.repeat(8), name: 'ai.generateText',
+        startTimeUnixNano: '1781100000000000000', endTimeUnixNano: '1781100001000000000',
+        attributes: [{ key: 'gen_ai.usage.total_tokens', value: { stringValue: '812' } }] },
+      { traceId: 'aa'.repeat(16), spanId: '02'.repeat(8), name: 'ai.generateText',
+        startTimeUnixNano: '1781100001000000000', endTimeUnixNano: '1781100002000000000',
+        attributes: [{ key: 'gen_ai.usage.total_tokens', value: { intValue: 150 } }] },
+    ] }] }],
+  }));
+  assert.equal(store.summary('aa'.repeat(16)).tokens, 962); // not "0812150"
+  store.clear();
+});
+
+test('--persist: unreadable history file degrades gracefully, server-side state intact', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tracelet-ro-')), 'traces.jsonl');
+  fs.writeFileSync(file, '');
+  fs.chmodSync(file, 0o000);
+  store.clear();
+  store.enablePersist(file); // must not throw
+  assert.equal(store.persistFile, file);
+  fs.chmodSync(file, 0o600);
+  store.persistFile = null;
+  fs.rmSync(path.dirname(file), { recursive: true, force: true });
+  store.clear();
+});

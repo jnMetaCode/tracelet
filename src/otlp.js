@@ -74,11 +74,11 @@ function extractTokens(attrs) {
   ]);
   const total = first(attrs, ['gen_ai.usage.total_tokens', 'llm.token_count.total']);
   if (input == null && output == null && total == null) return undefined;
-  return {
-    input: input ?? 0,
-    output: output ?? 0,
-    total: total ?? (Number(input || 0) + Number(output || 0)),
-  };
+  // Some exporters emit token counts as stringValue — coerce so downstream
+  // sums never string-concatenate.
+  const num = (v) => (v == null ? null : Number(v) || 0);
+  const i = num(input), o = num(output), t = num(total);
+  return { input: i ?? 0, output: o ?? 0, total: t ?? (i || 0) + (o || 0) };
 }
 
 // OpenInference flattens chat history into indexed keys:

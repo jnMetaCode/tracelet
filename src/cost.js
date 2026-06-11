@@ -41,7 +41,7 @@ function normalize(model) {
   // strip provider prefixes ("anthropic.claude-…", "openai/gpt-…", "models/gemini-…")
   m = m.replace(/^(anthropic|openai|google|models|publishers\/[a-z]+\/models)[./]/, '');
   // bedrock regional prefixes like "us.anthropic.claude-…"
-  m = m.replace(/^[a-z]{2}\.(anthropic|amazon)\./, '');
+  m = m.replace(/^[a-z][a-z-]{1,6}\.(anthropic|amazon)\./, '');
   return m;
 }
 
@@ -49,9 +49,14 @@ function normalize(model) {
 export function estimateCost(model, inputTokens, outputTokens) {
   const m = normalize(model);
   if (!m) return null;
+  const inp = Number(inputTokens) || 0;
+  const out = Number(outputTokens) || 0;
+  // A span that only reports a total can't be priced (in/out rates differ) —
+  // say "unknown" rather than a fake $0.
+  if (!inp && !out) return null;
   for (const [prefix, inRate, outRate] of TABLE) {
     if (m.startsWith(prefix)) {
-      return ((inputTokens || 0) * inRate + (outputTokens || 0) * outRate) / 1e6;
+      return (inp * inRate + out * outRate) / 1e6;
     }
   }
   return null;

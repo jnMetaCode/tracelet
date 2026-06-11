@@ -19,22 +19,28 @@ class Store {
   /** Load history from a JSONL file (if present), then append future batches. */
   enablePersist(file) {
     this.persistFile = null; // don't re-append while loading
-    if (fs.existsSync(file)) {
-      const lines = fs.readFileSync(file, 'utf8').split('\n');
-      let loaded = 0;
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          this.addSpans(JSON.parse(line));
-          loaded++;
-        } catch {
-          /* skip a torn/corrupt line rather than refusing to start */
+    try {
+      if (fs.existsSync(file)) {
+        const lines = fs.readFileSync(file, 'utf8').split('\n');
+        let loaded = 0;
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            this.addSpans(JSON.parse(line));
+            loaded++;
+          } catch {
+            /* skip a torn/corrupt line rather than refusing to start */
+          }
         }
+        // Compact: rewrite with only the spans the ring buffer retained.
+        const batches = this.order.map((id) => [...this.traces.get(id).spans.values()]);
+        fs.writeFileSync(file, batches.map((b) => JSON.stringify(b)).join('\n') + (batches.length ? '\n' : ''));
+        this.loadedBatches = loaded;
       }
-      // Compact: rewrite with only the spans the ring buffer retained.
-      const batches = this.order.map((id) => [...this.traces.get(id).spans.values()]);
-      fs.writeFileSync(file, batches.map((b) => JSON.stringify(b)).join('\n') + (batches.length ? '\n' : ''));
-      this.loadedBatches = loaded;
+    } catch (e) {
+      // An unreadable/unwritable history file must not stop the server —
+      // run with what we could load and keep trying to append.
+      console.error(`tracelet: could not load history from ${file}: ${e.message}`);
     }
     this.persistFile = file;
   }
@@ -97,7 +103,7 @@ class Store {
       errorCount: spans.filter((s) => s.status === 'ERROR').length,
       llmCalls: spans.filter((s) => s.kind === 'llm').length,
       toolCalls: spans.filter((s) => s.kind === 'tool').length,
-      tokens: spans.reduce((n, s) => n + (s.tokens?.total || 0), 0),
+      tokens: spans.reduce((n, s) => n + (Number(s.tokens?.total) || 0), 0),
       costUsd: estimateTraceCost(spans),
     };
   }
