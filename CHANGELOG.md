@@ -4,15 +4,6 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow semver.
 
 ## [Unreleased]
-### Added
-- **Pin a baseline** — pin a run (`p` or the header button) and every new run
-  that arrives is compared against it automatically. Survives reloads (and
-  restarts with `--persist`).
-- `examples/mastra.md` — wiring Mastra's `@mastra/otel-exporter` to tracelet.
-
-### Fixed
-- `examples/demo.js` generated identical trace ids in every process, so running
-  it twice merged both runs into one 30-second trace. Ids are random now.
 
 ## [0.3.0] - 2026-09-12
 ### Added
@@ -35,12 +26,18 @@ All notable changes to this project are documented here. The format follows
   `embeddings`) now drives span kinds; `gen_ai.provider.name` and
   `gen_ai.tool.call.arguments` / `.result` are read — the attribute set the
   official `@ai-sdk/otel` integration emits.
+- **Pin a baseline** — pin a run (`p` or the header button) and every new run
+  that arrives is compared against it automatically. Survives reloads (and
+  restarts with `--persist`).
+- `examples/mastra.md` — wiring Mastra's `@mastra/otel-exporter` to tracelet.
 
 ### Fixed
 - Trace token and cost totals no longer double-count when a wrapper span
   reports the same usage as the model call beneath it (AI SDK root + `chat`
   child, legacy `ai.generateText` + `.doGenerate`). Only the innermost
   token-bearing spans are summed.
+- `examples/demo.js` generated identical trace ids in every process, so running
+  it twice merged both runs into one 30-second trace. Ids are random now.
 
 ## [0.2.1] - 2026-06-11
 ### Fixed
