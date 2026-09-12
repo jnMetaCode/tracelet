@@ -47,7 +47,10 @@
       </aside>
 
       <section class="pane waterfall">
-        <div class="pane-head" id="trace-title">Select a trace</div>
+        <div class="pane-head">
+          <span id="trace-title">Select a trace</span>
+          <button id="pin" class="btn small" title="Pin this run as the baseline: every new run is compared against it automatically (p)" hidden>Pin as baseline</button>
+        </div>
         <div id="tree" class="tree"></div>
       </section>
 

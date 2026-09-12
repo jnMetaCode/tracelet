@@ -16,7 +16,13 @@ const state = {
   errorsOnly: false,
   picking: false, // "Compare" pressed, waiting for the second run
   compare: null, // { a, b, data, detailA, detailB, row }
+  baseline: null, // traceId every new run is auto-compared against
+  known: new Set(), // traceIds already seen, to spot brand-new runs
 };
+
+const BASELINE_KEY = 'tracelet.baseline';
+const loadBaseline = () => { try { return localStorage.getItem(BASELINE_KEY); } catch { return null; } };
+const saveBaseline = (id) => { try { id ? localStorage.setItem(BASELINE_KEY, id) : localStorage.removeItem(BASELINE_KEY); } catch {} };
 
 const fmtMs = (ms) => (ms < 1 ? '<1ms' : ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`);
 const fmtNum = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
@@ -65,6 +71,7 @@ function renderList() {
     const head = el('div', 't-head');
     if (state.compare?.a === t.traceId) head.appendChild(el('span', 'ab a', 'A'));
     if (state.compare?.b === t.traceId) head.appendChild(el('span', 'ab b', 'B'));
+    if (state.baseline === t.traceId) head.appendChild(el('span', 'ab base', '📌 base'));
     head.appendChild(el('div', 't-name', t.name || t.traceId.slice(0, 12)));
     head.appendChild(el('span', 't-time', fmtTime(t.start)));
     li.appendChild(head);
@@ -122,9 +129,11 @@ function renderTree() {
   const title = $('#trace-title');
   if (!d) {
     title.textContent = 'Select a trace';
+    renderPin();
     return;
   }
   title.innerHTML = '';
+  renderPin();
   title.appendChild(el('span', null, d.name || d.traceId.slice(0, 16)));
   title.appendChild(
     el(
@@ -278,13 +287,31 @@ function deltaEl(text, good) {
   return el('span', 'delta ' + (good == null ? '' : good ? 'good' : 'bad'), text);
 }
 
+function renderPin() {
+  const btn = $('#pin');
+  btn.hidden = !state.selected || !!state.compare;
+  const pinned = state.baseline && state.baseline === state.selected;
+  btn.textContent = pinned ? '📌 Baseline · unpin' : 'Pin as baseline';
+  btn.classList.toggle('primary', !!pinned);
+}
+
+function togglePin() {
+  if (!state.selected) return;
+  state.baseline = state.baseline === state.selected ? null : state.selected;
+  saveBaseline(state.baseline);
+  renderList();
+  renderPin();
+}
+
 function renderDiff() {
   const { data, row: active } = state.compare;
+  $('#pin').hidden = true;
   const { a, b, delta, counts, rows } = data;
   const title = $('#trace-title');
   title.innerHTML = '';
   const left = el('span', 'cmp-title');
   left.appendChild(el('span', 'ab a', 'A'));
+  if (state.baseline === a.traceId) left.appendChild(el('span', 'ab base', '📌 base'));
   left.appendChild(el('span', null, `${a.name} ${fmtTime(a.start)}`));
   left.appendChild(el('span', 'muted', ' → '));
   left.appendChild(el('span', 'ab b', 'B'));
@@ -480,6 +507,11 @@ async function selectTrace(id) {
 
 async function refreshList() {
   state.traces = (await api('/api/traces')) || [];
+  for (const t of state.traces) state.known.add(t.traceId);
+  if (state.baseline && !state.traces.some((t) => t.traceId === state.baseline)) {
+    state.baseline = null; // evicted or cleared
+    saveBaseline(null);
+  }
   renderList();
   if (!state.selected && state.traces.length) selectTrace(state.traces[0].traceId);
 }
@@ -499,9 +531,17 @@ function connect() {
     const msg = JSON.parse(e.data);
     if (msg.type === 'clear') {
       state.traces = []; state.selected = null; state.detail = null; state.compare = null; state.picking = false;
+      state.known.clear(); state.baseline = null; saveBaseline(null);
       renderList(); renderTree(); return;
     }
+    const isNew = msg.traceId && !state.known.has(msg.traceId);
     await refreshList();
+    if (isNew && state.baseline && msg.traceId !== state.baseline && state.traces.some((t) => t.traceId === state.baseline)) {
+      // A pinned baseline turns every new run into a regression check.
+      state.selected = state.baseline;
+      await startCompare(state.baseline, msg.traceId);
+      return;
+    }
     if (state.compare && (msg.traceId === state.compare.a || msg.traceId === state.compare.b)) {
       // One side is still streaming — recompute the comparison.
       const { a, b, row } = state.compare;
@@ -526,15 +566,19 @@ $('#compare').onclick = () => {
   state.picking = !state.picking;
   renderList();
 };
+$('#pin').onclick = togglePin;
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input')) return;
+  if (e.key === 'p' && !state.compare) togglePin();
   if (e.key === 'Escape' && state.picking) { state.picking = false; renderList(); }
   if (e.key === 'c' && !state.compare && state.selected) { state.picking = !state.picking; renderList(); }
 });
 
 // Deep links: #trace=<id> or #compare=<a>,<b> (handy for a second tab).
 async function boot() {
+  state.baseline = loadBaseline();
   await refreshList();
+  renderList();
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get('compare')) {
     const [a, b] = h.get('compare').split(',');

@@ -73,6 +73,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
   A、B 两侧以及 Δ 的延迟、token、成本。
 - **prompt 与 completion 的逐行 diff** 在右侧检视器中展示。
 - **顶部汇总差异**：延迟、token、成本、错误数——B 相对于 A。
+- **钉住基线**（`p`）：之后每一次新流入的运行都会自动和它对比——边改边跑的回归检查。
 
 `node examples/demo.js --compare` 会发送一对"修复前 / 修复后"的运行，不用接真实 agent 就能试。
 用 `#compare=<a>,<b>` 可以直接深链到一次对比。
@@ -86,7 +87,8 @@ tracelet 同时理解三套常见的追踪语义约定，无论 trace 是谁发�
 | **Vercel AI SDK v7+** | **一行、零额外依赖：** `import '@jnmetacode/tracelet/ai-sdk/register'`。见 [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md)。 |
 | **Vercel AI SDK v5/v6** | `experimental_telemetry: { isEnabled: true }` → OTLP 导出到 `localhost:4318`。同一篇文档。 |
 | **Python OTel SDK**（LangChain、CrewAI、OpenAI Agents SDK……） | 标准 exporter 原样可用（含 protobuf）。见 [`examples/python-opentelemetry`](examples/python-opentelemetry.md)。 |
-| **OpenInference**（LangChain、LlamaIndex、CrewAI、Mastra……） | 任何导出 OTLP 的 OpenInference instrumentor。 |
+| **Mastra** | `@mastra/otel-exporter` 的 `custom` endpoint 指向 `localhost:4318`。见 [`examples/mastra`](examples/mastra.md)。 |
+| **OpenInference**（LangChain、LlamaIndex、CrewAI…） | 任何导出 OTLP 的 OpenInference instrumentor。 |
 | **OpenTelemetry GenAI** 语义约定 | 原生 `gen_ai.*` span，内容在属性*或*事件里都行。 |
 | **任何 OTel** | 普通 span 也能渲染——只是少一些语义增强。 |
 
@@ -145,7 +147,8 @@ npx @jnmetacode/tracelet [选项]
 - [x] protobuf OTLP 摄取（零依赖解码器）—— 已完成
 - [ ] 瀑布图火焰缩放
 - [x] Vercel AI SDK 一行接入（`@jnmetacode/tracelet/ai-sdk`，零依赖）——已完成
-- [ ] 一行接入：Mastra、LangChain.js
+- [x] Mastra：纯配置接入 `@mastra/otel-exporter`（`examples/mastra.md`）
+- [ ] 一行接入：LangChain.js
 
 欢迎 PR。项目尚早——issue 和想法是当前最有价值的贡献。
 

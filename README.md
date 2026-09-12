@@ -76,6 +76,8 @@ actually matters: *what changed in the agent's behaviour?* Select a run, press
   per-step latency, tokens and cost for A, B and Δ.
 - **Prompt and completion diffs** in the inspector, line by line.
 - **Headline deltas**: latency, tokens, cost, errors — B relative to A.
+- **Pin a baseline** (`p`): every new run that streams in is compared against
+  it automatically — a regression check that runs while you iterate.
 
 `node examples/demo.js --compare` sends a before/after pair so you can try it
 without wiring an agent. Deep-link a comparison with `#compare=<a>,<b>`.
@@ -90,7 +92,8 @@ tracelet speaks the three common tracing vocabularies on the same spans, so it
 | **Vercel AI SDK v7+** | **One line, zero extra packages:** `import '@jnmetacode/tracelet/ai-sdk/register'`. See [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md). |
 | **Vercel AI SDK v5/v6** | `experimental_telemetry: { isEnabled: true }` → export OTLP to `localhost:4318`. Same doc. |
 | **Python OTel SDK** (LangChain, CrewAI, OpenAI Agents SDK…) | The standard exporter works as-is (protobuf included). See [`examples/python-opentelemetry`](examples/python-opentelemetry.md). |
-| **OpenInference** (LangChain, LlamaIndex, CrewAI, Mastra…) | Any OpenInference instrumentor exporting OTLP. |
+| **Mastra** | `@mastra/otel-exporter` with a `custom` endpoint of `localhost:4318`. See [`examples/mastra`](examples/mastra.md). |
+| **OpenInference** (LangChain, LlamaIndex, CrewAI…) | Any OpenInference instrumentor exporting OTLP. |
 | **OpenTelemetry GenAI** semconv | Native `gen_ai.*` spans, content as attributes *or* events. |
 | **Anything OTel** | Plain spans render too — you just get less semantic enrichment. |
 
@@ -153,7 +156,8 @@ npx @jnmetacode/tracelet [options]
 - [ ] Waterfall flamegraph zoom
 - [ ] Trace list: search inside prompts/outputs, filter by model/tool
 - [x] One-line wrapper for the Vercel AI SDK (`@jnmetacode/tracelet/ai-sdk`, zero deps) — done
-- [ ] One-line wrappers: Mastra, LangChain.js
+- [x] Mastra: config-only wiring via `@mastra/otel-exporter` (`examples/mastra.md`)
+- [ ] One-line wrapper: LangChain.js
 
 PRs welcome. This is early — issues and ideas are the most useful contribution
 right now.

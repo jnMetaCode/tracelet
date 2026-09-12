@@ -92,7 +92,7 @@ body {
 
 /* Waterfall / tree */
 .waterfall { overflow: hidden; }
-#trace-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#trace-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: 1; min-width: 0; }
 .tree { overflow: auto; flex: 1; padding: 6px 0; }
 .row {
   display: grid;
@@ -228,3 +228,7 @@ body {
 .dl.ctx { color: var(--muted); }
 .dl.ctx::before { content: "  "; }
 .dl.skip { color: var(--muted); font-style: italic; text-align: center; background: var(--bg); }
+
+/* Baseline pin */
+.ab.base { background: rgba(251,191,36,.18); color: #fbbf24; font-weight: 600; }
+.btn.small.primary { background: rgba(124,156,255,.08); }

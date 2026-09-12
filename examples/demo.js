@@ -13,15 +13,14 @@
 // answers without it) and "after" (the tool is fixed, the summariser moved to
 // a cheaper model) — so you can try Compare in the UI straight away.
 
+import { randomBytes } from 'node:crypto';
+
 const ENDPOINT = process.env.TRACELET_URL || 'http://localhost:4318/v1/traces';
 const COMPARE = process.argv.includes('--compare');
 
-// Tiny hex id helpers (deterministic-ish; randomness only needs to be unique).
-let counter = 1;
-const hex = (bytes) =>
-  Array.from({ length: bytes }, (_, i) => (((counter++ * 2654435761) >>> (i % 24)) & 0xff))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+// Random trace/span ids. (An earlier deterministic counter produced the same
+// ids in every process, so two demo runs merged into one 30-second trace.)
+const hex = (bytes) => randomBytes(bytes).toString('hex');
 
 const s = (v) => ({ stringValue: v });
 const i = (v) => ({ intValue: String(v) });

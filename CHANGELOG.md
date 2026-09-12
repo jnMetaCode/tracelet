@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow semver.
 
 ## [Unreleased]
+### Added
+- **Pin a baseline** — pin a run (`p` or the header button) and every new run
+  that arrives is compared against it automatically. Survives reloads (and
+  restarts with `--persist`).
+- `examples/mastra.md` — wiring Mastra's `@mastra/otel-exporter` to tracelet.
+
+### Fixed
+- `examples/demo.js` generated identical trace ids in every process, so running
+  it twice merged both runs into one 30-second trace. Ids are random now.
 
 ## [0.3.0] - 2026-09-12
 ### Added
