@@ -37,12 +37,29 @@ export const mastra = new Mastra({
 ```
 
 Run tracelet in one terminal (`npx @jnmetacode/tracelet`) and `mastra dev` in
-another. Agent runs, model calls and tool executions stream into tracelet as
-they happen; Mastra emits OpenTelemetry GenAI (`gen_ai.*`) attributes, which
-tracelet renders as LLM / tool spans with prompts, completions and usage.
+another. Mastra emits OpenTelemetry GenAI (`gen_ai.*`) spans, which tracelet
+renders as:
+
+```
+invoke_agent weather              ← the run (agent)
+└─ chat claude-sonnet-4.5         ← prompt messages, completion, usage
+   ├─ model_step weather
+   │  ├─ model_inference weather
+   │  └─ execute_tool getWeather  ← args, result
+   └─ model_step weather
+      └─ model_inference weather
+```
+
+> **Traces show up ~5 s after a run.** `@mastra/otel-exporter` uses a
+> BatchSpanProcessor with a 5-second delay. In `mastra dev` that's invisible;
+> in a short script, keep the process alive a few seconds (or call the
+> exporter's `shutdown()`) before exiting.
 
 > Mastra Studio shows a single run. tracelet's **Compare** shows what changed
 > between two — pin a baseline and every `mastra dev` run is diffed against it.
 
-Snippet follows Mastra's [OTel exporter docs](https://mastra.ai/en/docs/observability/tracing/exporters/otel);
-if a Mastra release changes the config shape, that page is the source of truth.
+Verified against `@mastra/core` 1.66 + `@mastra/observability` 1.17 +
+`@mastra/otel-exporter` 1.3 (an `Agent` with a tool, invoked through
+`mastra.getAgent()`). Config shape follows Mastra's
+[OTel exporter docs](https://mastra.ai/en/docs/observability/tracing/exporters/otel);
+if a release changes it, that page is the source of truth.

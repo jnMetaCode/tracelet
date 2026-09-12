@@ -29,7 +29,8 @@ All notable changes to this project are documented here. The format follows
 - **Pin a baseline** — pin a run (`p` or the header button) and every new run
   that arrives is compared against it automatically. Survives reloads (and
   restarts with `--persist`).
-- `examples/mastra.md` — wiring Mastra's `@mastra/otel-exporter` to tracelet.
+- `examples/mastra.md` — wiring Mastra's `@mastra/otel-exporter` to tracelet
+  (verified against @mastra/core 1.66).
 - **`@jnmetacode/tracelet/langchain`** — a zero-dependency LangChain.js /
   LangGraph.js callback handler: `{ callbacks: [tracelet()] }` streams the run
   tree (agent → graph node → chat / tool) with prompts, tool args/results,
