@@ -91,6 +91,8 @@ function handleUi(req, res) {
   if (req.method === 'POST' && path === '/v1/traces') return handleTraces(req, res);
 
   if (req.method === 'GET' && path === '/api/traces') return send(res, 200, store.list());
+  // Full-text search over prompts, completions, tool payloads, models, names.
+  if (req.method === 'GET' && path === '/api/search') return send(res, 200, store.search(url.searchParams.get('q')));
   // Compare two runs step by step: /api/diff?a=<traceId>&b=<traceId>
   if (req.method === 'GET' && path === '/api/diff') {
     const a = store.detail(url.searchParams.get('a') || '');

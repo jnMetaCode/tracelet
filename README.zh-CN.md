@@ -76,6 +76,8 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 - **顶部汇总差异**：延迟、token、成本、错误数——B 相对于 A。
 - **钉住基线**（`p`）：之后每一次新流入的运行都会自动和它对比——边改边跑的回归检查。
 
+运行列表本身可以搜索（`/`）：名称、模型、工具名，以及 prompt / completion / 工具载荷的全文——命中的 span 会在瀑布图里高亮。
+
 `node examples/demo.js --compare` 会发送一对"修复前 / 修复后"的运行，不用接真实 agent 就能试。
 用 `#compare=<a>,<b>` 可以直接深链到一次对比。
 

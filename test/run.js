@@ -796,3 +796,22 @@ test('langchain handler: errors mark spans; recordInputs/Outputs=false strip con
   assert.equal(spans.find((s) => s.kind === 'tool').statusMessage, 'db down');
   assert.equal(spans.find((s) => s.kind === 'agent').statusMessage, 'agent failed');
 });
+
+test('search: matches prompts/outputs/tool payloads/models across traces, case-insensitive', async () => {
+  store.clear();
+  const mk = (tid, spanId, attrs) => baseSpan({ traceId: tid, spanId, attributes: attrs });
+  const A = 'ab'.repeat(16), B = 'cd'.repeat(16);
+  store.addSpans(parseOtlp(envelope([
+    mk(A, 'a1', [{ key: 'gen_ai.request.model', value: s('claude-haiku-4-5') }, { key: 'ai.prompt', value: s('Weather in San Francisco?') }]),
+    mk(A, 'a2', [{ key: 'tool.name', value: s('get_calendar') }, { key: 'ai.toolCall.args', value: s('{"date":"today"}') }]),
+    mk(B, 'b1', [{ key: 'gen_ai.request.model', value: s('gpt-4o') }, { key: 'ai.response.text', value: s('Bring a JACKET.') }]),
+  ])));
+  assert.deepEqual(store.search('san francisco'), { [A]: ['a1'] });
+  assert.deepEqual(store.search('jacket'), { [B]: ['b1'] });
+  assert.deepEqual(store.search('get_calendar'), { [A]: ['a2'] });
+  assert.deepEqual(store.search('haiku'), { [A]: ['a1'] });
+  assert.deepEqual(store.search('   '), {});
+  assert.deepEqual(store.summary(A).models, ['claude-haiku-4-5']);
+  assert.deepEqual(store.summary(A).tools, ['get_calendar']);
+  store.clear();
+});

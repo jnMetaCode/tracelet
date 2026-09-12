@@ -232,3 +232,8 @@ body {
 /* Baseline pin */
 .ab.base { background: rgba(251,191,36,.18); color: #fbbf24; font-weight: 600; }
 .btn.small.primary { background: rgba(124,156,255,.08); }
+
+/* Content search */
+.hit-tag { color: #fbbf24; }
+.row.hit { box-shadow: inset 3px 0 0 #fbbf24; }
+.row.hit .span-name { color: #fde68a; }

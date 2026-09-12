@@ -80,6 +80,10 @@ actually matters: *what changed in the agent's behaviour?* Select a run, press
 - **Pin a baseline** (`p`): every new run that streams in is compared against
   it automatically — a regression check that runs while you iterate.
 
+The run list searches too (`/`): names, models, tool names, and the full text
+of prompts, completions and tool payloads — matching spans light up in the
+waterfall.
+
 `node examples/demo.js --compare` sends a before/after pair so you can try it
 without wiring an agent. Deep-link a comparison with `#compare=<a>,<b>`.
 
@@ -156,7 +160,7 @@ npx @jnmetacode/tracelet [options]
 - [x] Cost estimates per model (list-price `~$` on traces and LLM spans) — done
 - [x] protobuf OTLP ingest (zero-dep decoder) — done
 - [ ] Waterfall flamegraph zoom
-- [ ] Trace list: search inside prompts/outputs, filter by model/tool
+- [x] Trace list: search inside prompts/outputs, filter by model/tool — done
 - [x] One-line wrapper for the Vercel AI SDK (`@jnmetacode/tracelet/ai-sdk`, zero deps) — done
 - [x] Mastra: config-only wiring via `@mastra/otel-exporter` (`examples/mastra.md`)
 - [x] One-line wrapper for LangChain.js / LangGraph.js (`@jnmetacode/tracelet/langchain`, zero deps) — done

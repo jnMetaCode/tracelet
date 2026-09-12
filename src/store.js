@@ -128,7 +128,39 @@ class Store {
       toolCalls: spans.filter((s) => s.kind === 'tool').length,
       tokens: billable.reduce((n, s) => n + (Number(s.tokens?.total) || 0), 0),
       costUsd: estimateTraceCost(billable),
+      models: [...new Set(spans.map((s) => s.io?.model).filter(Boolean))],
+      tools: [...new Set(spans.map((s) => s.io?.toolName).filter(Boolean))],
     };
+  }
+
+  /**
+   * Case-insensitive substring search over span names, models, tool names and
+   * prompt / completion / tool payloads. Returns { traceId: [spanId, …] } for
+   * every trace with at least one matching span, newest trace first.
+   */
+  search(q) {
+    const needle = String(q || '').trim().toLowerCase();
+    const out = {};
+    if (!needle) return out;
+    const text = (v) => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v)).toLowerCase();
+    for (const id of [...this.order].reverse()) {
+      const t = this.traces.get(id);
+      const hits = [];
+      for (const s of t.spans.values()) {
+        const io = s.io || {};
+        if (
+          text(s.name).includes(needle) ||
+          text(io.model).includes(needle) ||
+          text(io.toolName).includes(needle) ||
+          text(io.input).includes(needle) ||
+          text(io.output).includes(needle) ||
+          text(io.system_instructions).includes(needle) ||
+          text(s.statusMessage).includes(needle)
+        ) hits.push(s.spanId);
+      }
+      if (hits.length) out[id] = hits;
+    }
+    return out;
   }
 
   list() {

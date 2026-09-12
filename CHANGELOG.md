@@ -36,6 +36,10 @@ All notable changes to this project are documented here. The format follows
   usage and errors. LangGraph's hidden plumbing runs are folded away. Honors
   `recordInputs` / `recordOutputs`. Verified against `langchain@1.x`
   `createAgent`. (Integrations share one OTLP emitter, `src/emit.js`.)
+- **Search** — the run list filter now also matches models, tool names and
+  the full text of prompts, completions and tool payloads (`GET /api/search?q=`);
+  matching spans are highlighted in the waterfall. `/` focuses the box.
+  Summaries carry `models` and `tools`.
 
 ### Fixed
 - Trace token and cost totals no longer double-count when a wrapper span

@@ -18,6 +18,7 @@ const state = {
   compare: null, // { a, b, data, detailA, detailB, row }
   baseline: null, // traceId every new run is auto-compared against
   known: new Set(), // traceIds already seen, to spot brand-new runs
+  hits: {}, // server content search: traceId → [spanId] for the current filter
 };
 
 const BASELINE_KEY = 'tracelet.baseline';
@@ -41,13 +42,33 @@ async function api(path, opts) {
 }
 
 // ---- trace list ----------------------------------------------------------
+// Name / model / tool matches are answered locally from the summaries; prompt
+// and completion content comes from /api/search (see runSearch), merged in.
 function visibleTraces() {
   const q = state.filter.trim().toLowerCase();
-  return state.traces.filter(
-    (t) =>
-      (!state.errorsOnly || t.errorCount) &&
-      (!q || (t.name || '').toLowerCase().includes(q) || t.traceId.startsWith(q))
-  );
+  const local = (t) =>
+    (t.name || '').toLowerCase().includes(q) ||
+    t.traceId.startsWith(q) ||
+    (t.models || []).some((m) => m.toLowerCase().includes(q)) ||
+    (t.tools || []).some((m) => m.toLowerCase().includes(q));
+  return state.traces.filter((t) => (!state.errorsOnly || t.errorCount) && (!q || local(t) || state.hits[t.traceId]));
+}
+
+let searchTimer = null;
+function runSearch() {
+  clearTimeout(searchTimer);
+  const q = state.filter.trim();
+  if (!q) {
+    state.hits = {};
+    return renderList();
+  }
+  searchTimer = setTimeout(async () => {
+    const hits = (await api(`/api/search?q=${encodeURIComponent(q)}`)) || {};
+    if (state.filter.trim() !== q) return; // stale
+    state.hits = hits;
+    renderList();
+    if (!state.compare) renderTree(); // highlight matching spans
+  }, 120);
 }
 
 function renderList() {
@@ -81,6 +102,8 @@ function renderList() {
     if (t.toolCalls) meta.appendChild(el('span', null, `${t.toolCalls} tool`));
     if (t.tokens) meta.appendChild(el('span', null, `${fmtNum(t.tokens)} tok`));
     if (t.costUsd != null) meta.appendChild(el('span', null, fmtCost(t.costUsd)));
+    const n = state.hits[t.traceId]?.length;
+    if (n) meta.appendChild(el('span', 'hit-tag', `${n} match${n === 1 ? '' : 'es'}`));
     li.appendChild(meta);
     li.onclick = () => {
       if (state.picking) {
@@ -149,6 +172,7 @@ function renderTree() {
   for (const { span: s, depth } of buildTree(d.spans)) {
     const row = el('div', 'row' + (s.status === 'ERROR' ? ' err' : ''));
     if (s.spanId === state.selectedSpan) row.classList.add('active');
+    if (state.hits[d.traceId]?.includes(s.spanId)) row.classList.add('hit');
 
     const label = el('div', 'label');
     label.style.paddingLeft = `${depth * 14}px`;
@@ -559,7 +583,7 @@ function connect() {
 
 // ---- controls ------------------------------------------------------------
 $('#clear').onclick = () => api('/api/clear', { method: 'POST' });
-$('#filter').oninput = (e) => { state.filter = e.target.value; renderList(); };
+$('#filter').oninput = (e) => { state.filter = e.target.value; renderList(); runSearch(); };
 $('#errors-only').onchange = (e) => { state.errorsOnly = e.target.checked; renderList(); };
 $('#compare').onclick = () => {
   if (state.compare) return exitCompare();
@@ -570,6 +594,7 @@ $('#pin').onclick = togglePin;
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input')) return;
   if (e.key === 'p' && !state.compare) togglePin();
+  if (e.key === '/') { e.preventDefault(); $('#filter').focus(); }
   if (e.key === 'Escape' && state.picking) { state.picking = false; renderList(); }
   if (e.key === 'c' && !state.compare && state.selected) { state.picking = !state.picking; renderList(); }
 });
