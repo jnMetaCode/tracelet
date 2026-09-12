@@ -5,3 +5,8 @@ dist/
 *.sqlite
 .env
 .env.local
+
+# recording scratch (docs/record-ui.mjs, docs/demo-term.tape)
+docs/video/
+term.mp4
+term.gif

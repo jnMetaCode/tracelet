@@ -1,11 +1,74 @@
 # Wiring the Vercel AI SDK to tracelet
 
-The AI SDK only *records* spans into whatever OpenTelemetry tracer is active —
-you provide the exporter. Point it at tracelet's ingest endpoint and you're done.
+Two ways, depending on your AI SDK version. Both are verified against a live
+tracelet.
 
-## Node / Express / Hono / standalone script
+## AI SDK v7+ — one line, zero extra packages
 
-Install the OTel bits (these are the only deps, and only in *your* app):
+AI SDK 7 replaced "bring an OpenTelemetry tracer" with **telemetry
+integrations** — plain objects with `onStart` / `onLanguageModelCallStart` /
+`onToolExecutionStart` … callbacks that you register once. tracelet ships one.
+It speaks OTLP over `fetch` directly, so there is nothing to install besides
+tracelet itself, and no `@opentelemetry/*` packages in your app.
+
+```bash
+npm i -D @jnmetacode/tracelet
+```
+
+```js
+// at the top of your entry file (or Next.js instrumentation.ts)
+import '@jnmetacode/tracelet/ai-sdk/register';
+```
+
+That's it. Every `generateText` / `streamText` in the process now streams to
+`http://localhost:4318` while tracelet is running:
+
+```
+ai.generateText              ← the run (agent)
+├─ chat claude-sonnet-4.5    ← model round-trip 1: prompt, tool definitions, usage
+├─ ai.toolCall get_weather   ← args, result (or the error)
+└─ chat claude-sonnet-4.5    ← model round-trip 2: completion, usage
+```
+
+Prefer explicit registration, or want to configure it? Same thing, two lines:
+
+```js
+import { registerTelemetry } from 'ai';
+import { tracelet } from '@jnmetacode/tracelet/ai-sdk';
+
+registerTelemetry(
+  tracelet({
+    serviceName: 'weather-agent',           // default: 'ai-sdk'
+    url: 'http://localhost:4318/v1/traces', // default; or set TRACELET_URL
+  })
+);
+```
+
+Per-call options still apply, and privacy flags are honored:
+
+```js
+await generateText({
+  model,
+  prompt,
+  tools,
+  experimental_telemetry: {
+    functionId: 'weather-agent', // becomes the agent name in tracelet
+    recordInputs: false,         // prompts/args never leave the process
+    recordOutputs: false,        // completions/results neither
+  },
+});
+```
+
+> Already using the official `@ai-sdk/otel` integration with an OTel SDK? Keep
+> it — just point the exporter at `http://localhost:4318` (see below). tracelet
+> reads the `gen_ai.*` / `ai.*` attributes it emits.
+
+## AI SDK v5 / v6 — via an OpenTelemetry exporter
+
+These versions record spans into whatever OpenTelemetry tracer is active, so
+you provide an exporter and point it at tracelet.
+
+### Node / Express / Hono / standalone script
 
 ```bash
 npm i @opentelemetry/sdk-node @opentelemetry/exporter-trace-otlp-http
@@ -18,12 +81,9 @@ Create `instrumentation.js` and import it **before** anything that uses the AI S
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 
-const sdk = new NodeSDK({
-  traceExporter: new OTLPTraceExporter({
-    url: 'http://localhost:4318/v1/traces', // ← tracelet
-  }),
-});
-sdk.start();
+new NodeSDK({
+  traceExporter: new OTLPTraceExporter({ url: 'http://localhost:4318/v1/traces' }),
+}).start();
 ```
 
 ```js
@@ -38,10 +98,7 @@ const { text } = await generateText({
 });
 ```
 
-Run tracelet in one terminal (`npx @jnmetacode/tracelet`), your app in another, and the
-`ai.generateText` / `ai.toolCall` spans stream into the UI live.
-
-## Next.js
+### Next.js
 
 `@vercel/otel` reads the standard env vars, so no exporter code is needed:
 

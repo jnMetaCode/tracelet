@@ -6,6 +6,7 @@ import { dirname, join, normalize } from 'node:path';
 import { store } from './store.js';
 import { parseOtlp } from './otlp.js';
 import { decodeTraces } from './otlp-protobuf.js';
+import { diffTraces } from './diff.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, '..', 'public');
@@ -90,6 +91,13 @@ function handleUi(req, res) {
   if (req.method === 'POST' && path === '/v1/traces') return handleTraces(req, res);
 
   if (req.method === 'GET' && path === '/api/traces') return send(res, 200, store.list());
+  // Compare two runs step by step: /api/diff?a=<traceId>&b=<traceId>
+  if (req.method === 'GET' && path === '/api/diff') {
+    const a = store.detail(url.searchParams.get('a') || '');
+    const b = store.detail(url.searchParams.get('b') || '');
+    if (!a || !b) return send(res, 404, { error: 'both a and b must be known trace ids' });
+    return send(res, 200, diffTraces(a, b));
+  }
   if (req.method === 'GET' && path.startsWith('/api/traces/')) {
     const id = decodeURIComponent(path.slice('/api/traces/'.length));
     const d = store.detail(id);

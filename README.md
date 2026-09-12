@@ -13,7 +13,7 @@ npx @jnmetacode/tracelet
 
 English | [简体中文](https://github.com/jnMetaCode/tracelet/blob/main/README.zh-CN.md)
 
-![tracelet demo — a live agent trace streams in; inspect the LLM call (prompt, tokens) and the errored tool call](https://raw.githubusercontent.com/jnMetaCode/tracelet/main/docs/demo.gif)
+![tracelet demo — two agent runs stream in live; Compare aligns their steps and shows what changed: the fixed tool, the model swap, the prompt diff, Δ latency/tokens/cost](https://raw.githubusercontent.com/jnMetaCode/tracelet/main/docs/demo.gif)
 
 </div>
 
@@ -38,9 +38,18 @@ npx @jnmetacode/tracelet
 
 # 2. See it work with a synthetic agent trace
 npx @jnmetacode/tracelet & sleep 1 && node examples/demo.js
+
+# 3. Send two runs of the same agent and diff them (Compare button)
+node examples/demo.js --compare
 ```
 
-Then point your real agent's OpenTelemetry exporter at the ingest endpoint:
+Using the **Vercel AI SDK (v7+)**? One import, no OpenTelemetry packages:
+
+```js
+import '@jnmetacode/tracelet/ai-sdk/register'; // top of your entry file
+```
+
+Anything else: point your agent's OpenTelemetry exporter at the ingest endpoint:
 
 ```
 http://localhost:4318/v1/traces
@@ -55,6 +64,22 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 Both OTLP/HTTP encodings work: **protobuf** (the exporter default) and **JSON**.
 No `OTEL_EXPORTER_OTLP_PROTOCOL` needed.
 
+## Compare two runs
+
+Change a prompt, swap a model, fix a tool — then answer the question that
+actually matters: *what changed in the agent's behaviour?* Select a run, press
+**Compare** (or `c`), pick a second run:
+
+- **Steps aligned side by side.** Retries, dropped tool calls and new steps
+  show as `+ added` / `− removed`; the rest stays lined up instead of shifting.
+- **Every changed step flagged** — `status`, `model`, `input`, `output` — with
+  per-step latency, tokens and cost for A, B and Δ.
+- **Prompt and completion diffs** in the inspector, line by line.
+- **Headline deltas**: latency, tokens, cost, errors — B relative to A.
+
+`node examples/demo.js --compare` sends a before/after pair so you can try it
+without wiring an agent. Deep-link a comparison with `#compare=<a>,<b>`.
+
 ## Works with what you already use
 
 tracelet speaks the three common tracing vocabularies on the same spans, so it
@@ -62,7 +87,8 @@ tracelet speaks the three common tracing vocabularies on the same spans, so it
 
 | Source | How |
 | --- | --- |
-| **Vercel AI SDK** | `experimental_telemetry: { isEnabled: true }` → export OTLP to `localhost:4318`. See [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md). |
+| **Vercel AI SDK v7+** | **One line, zero extra packages:** `import '@jnmetacode/tracelet/ai-sdk/register'`. See [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md). |
+| **Vercel AI SDK v5/v6** | `experimental_telemetry: { isEnabled: true }` → export OTLP to `localhost:4318`. Same doc. |
 | **Python OTel SDK** (LangChain, CrewAI, OpenAI Agents SDK…) | The standard exporter works as-is (protobuf included). See [`examples/python-opentelemetry`](examples/python-opentelemetry.md). |
 | **OpenInference** (LangChain, LlamaIndex, CrewAI, Mastra…) | Any OpenInference instrumentor exporting OTLP. |
 | **OpenTelemetry GenAI** semconv | Native `gen_ai.*` spans, content as attributes *or* events. |
@@ -121,11 +147,13 @@ npx @jnmetacode/tracelet [options]
 ## Roadmap
 
 - [x] Opt-in local history (`--persist traces.jsonl`) — done
-- [ ] Diff two runs side by side
+- [x] Diff two runs side by side (Compare: aligned steps, prompt/output diffs, Δ latency/tokens/cost) — done
 - [x] Cost estimates per model (list-price `~$` on traces and LLM spans) — done
 - [x] protobuf OTLP ingest (zero-dep decoder) — done
 - [ ] Waterfall flamegraph zoom
-- [ ] One-line wrappers: `tracelet/vercel`, `tracelet/langchain`
+- [ ] Trace list: search inside prompts/outputs, filter by model/tool
+- [x] One-line wrapper for the Vercel AI SDK (`@jnmetacode/tracelet/ai-sdk`, zero deps) — done
+- [ ] One-line wrappers: Mastra, LangChain.js
 
 PRs welcome. This is early — issues and ideas are the most useful contribution
 right now.

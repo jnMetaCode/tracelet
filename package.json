@@ -1,12 +1,18 @@
 {
   "name": "@jnmetacode/tracelet",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Local-first DevTools for AI agents. See every tool call, prompt, and token — 100% on your machine. Zero cloud, zero signup, one command.",
   "type": "module",
   "bin": {
     "tracelet": "./src/cli.js"
   },
   "main": "./src/server.js",
+  "exports": {
+    ".": "./src/server.js",
+    "./ai-sdk": "./src/ai-sdk.js",
+    "./ai-sdk/register": "./src/ai-sdk-register.js",
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "start": "node src/cli.js",
     "dev": "node src/cli.js --port 4318",

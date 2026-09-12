@@ -36,9 +36,18 @@ npx @jnmetacode/tracelet
 
 # 2. 用一条合成的 agent trace 看看效果
 npx @jnmetacode/tracelet & sleep 1 && node examples/demo.js
+
+# 3. 发送同一个 agent 的两次运行，然后对比（Compare 按钮）
+node examples/demo.js --compare
 ```
 
-然后把真实 agent 的 OpenTelemetry exporter 指向摄取端点：
+用的是 **Vercel AI SDK（v7+）**？一行 import，不用装任何 OpenTelemetry 包：
+
+```js
+import '@jnmetacode/tracelet/ai-sdk/register'; // 放在入口文件最顶部
+```
+
+其他框架：把 agent 的 OpenTelemetry exporter 指向摄取端点：
 
 ```
 http://localhost:4318/v1/traces
@@ -53,13 +62,29 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 两种 OTLP/HTTP 编码都支持：**protobuf**（exporter 的默认格式）和 **JSON**。
 不需要设置 `OTEL_EXPORTER_OTLP_PROTOCOL`。
 
+## 对比两次运行
+
+改了一句 prompt、换了个模型、修了一个工具——真正要回答的问题是：*agent 的行为到底变了什么？*
+选中一次运行，按 **Compare**（或键盘 `c`），再点另一次运行：
+
+- **步骤逐行对齐。** 多出来的重试、丢掉的工具调用、新增的步骤显示为 `+ added` / `− removed`，
+  其余步骤保持对齐，不会整体错位。
+- **每个有变化的步骤都打标**——`status`、`model`、`input`、`output`——并给出该步骤在
+  A、B 两侧以及 Δ 的延迟、token、成本。
+- **prompt 与 completion 的逐行 diff** 在右侧检视器中展示。
+- **顶部汇总差异**：延迟、token、成本、错误数——B 相对于 A。
+
+`node examples/demo.js --compare` 会发送一对"修复前 / 修复后"的运行，不用接真实 agent 就能试。
+用 `#compare=<a>,<b>` 可以直接深链到一次对比。
+
 ## 与你现有的技术栈即插即用
 
 tracelet 同时理解三套常见的追踪语义约定，无论 trace 是谁发出的都能直接渲染：
 
 | 来源 | 接法 |
 | --- | --- |
-| **Vercel AI SDK** | `experimental_telemetry: { isEnabled: true }` → OTLP 导出到 `localhost:4318`。见 [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md)。 |
+| **Vercel AI SDK v7+** | **一行、零额外依赖：** `import '@jnmetacode/tracelet/ai-sdk/register'`。见 [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md)。 |
+| **Vercel AI SDK v5/v6** | `experimental_telemetry: { isEnabled: true }` → OTLP 导出到 `localhost:4318`。同一篇文档。 |
 | **Python OTel SDK**（LangChain、CrewAI、OpenAI Agents SDK……） | 标准 exporter 原样可用（含 protobuf）。见 [`examples/python-opentelemetry`](examples/python-opentelemetry.md)。 |
 | **OpenInference**（LangChain、LlamaIndex、CrewAI、Mastra……） | 任何导出 OTLP 的 OpenInference instrumentor。 |
 | **OpenTelemetry GenAI** 语义约定 | 原生 `gen_ai.*` span，内容在属性*或*事件里都行。 |
@@ -115,11 +140,12 @@ npx @jnmetacode/tracelet [选项]
 ## 路线图
 
 - [x] 可选本地历史（`--persist traces.jsonl`）—— 已完成
-- [ ] 两次运行的并排对比（diff）
+- [x] 两次运行的并排对比（Compare：步骤对齐、prompt/输出 diff、Δ 延迟/token/成本）——已完成
 - [x] 按模型估算成本（trace 和 LLM span 显示 `~$`）—— 已完成
 - [x] protobuf OTLP 摄取（零依赖解码器）—— 已完成
 - [ ] 瀑布图火焰缩放
-- [ ] 一行接入包装：`tracelet/vercel`、`tracelet/langchain`
+- [x] Vercel AI SDK 一行接入（`@jnmetacode/tracelet/ai-sdk`，零依赖）——已完成
+- [ ] 一行接入：Mastra、LangChain.js
 
 欢迎 PR。项目尚早——issue 和想法是当前最有价值的贡献。
 

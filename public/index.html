@@ -26,8 +26,16 @@
     <main class="layout">
       <aside class="pane traces">
         <div class="pane-head">
-          Traces <span id="trace-count" class="muted"></span>
+          <span>Traces <span id="trace-count" class="muted"></span></span>
+          <button id="compare" class="btn small" title="Compare the selected run with another one (c)">
+            Compare
+          </button>
         </div>
+        <div class="filterbar">
+          <input id="filter" type="search" placeholder="Filter runs…" spellcheck="false" />
+          <label title="Only runs with errored spans"><input id="errors-only" type="checkbox" /> ⚠ only</label>
+        </div>
+        <div id="pick-hint" class="pick-hint" hidden>Pick the run to compare against · <kbd>Esc</kbd> cancels</div>
         <ul id="trace-list" class="trace-list"></ul>
         <div id="empty" class="empty">
           <p>Waiting for traces…</p>
@@ -44,7 +52,7 @@
       </section>
 
       <aside class="pane detail">
-        <div class="pane-head">Span</div>
+        <div class="pane-head" id="detail-title">Span</div>
         <div id="detail" class="detail">
           <p class="muted">Select a span to inspect its prompt, response, tokens and attributes.</p>
         </div>

@@ -8,6 +8,28 @@ import { estimateCost, estimateTraceCost } from './cost.js';
 
 const MAX_TRACES = 500; // ring buffer; oldest traces are evicted
 
+// Spans whose token counts should be summed for a trace. Many instrumentations
+// report usage on a wrapper span AND on the model call beneath it (the AI SDK's
+// `ai.generateText` root + `chat <model>` child, or the legacy
+// `ai.generateText` + `ai.generateText.doGenerate` pair). Counting both doubles
+// the trace total, so only the *innermost* token-bearing spans count: a span
+// is skipped when any descendant already carries tokens.
+function tokenLeaves(spans) {
+  const parentOf = new Map(spans.map((s) => [s.spanId, s.parentSpanId]));
+  const hasTokenChild = new Set();
+  for (const s of spans) {
+    if (!s.tokens) continue;
+    // Walk up: every ancestor of a token-bearing span is not a leaf.
+    let p = parentOf.get(s.spanId);
+    let hops = 0;
+    while (p && hops++ < 1000) {
+      hasTokenChild.add(p);
+      p = parentOf.get(p);
+    }
+  }
+  return spans.filter((s) => s.tokens && !hasTokenChild.has(s.spanId));
+}
+
 class Store {
   constructor() {
     /** @type {Map<string, {traceId:string, spans:Map<string,object>, start:number, end:number, name:string}>} */
@@ -91,6 +113,7 @@ class Store {
     const t = this.traces.get(traceId);
     if (!t) return null;
     const spans = [...t.spans.values()];
+    const billable = tokenLeaves(spans);
     const bounded = Number.isFinite(t.start) && Number.isFinite(t.end);
     return {
       type: 'trace',
@@ -103,8 +126,8 @@ class Store {
       errorCount: spans.filter((s) => s.status === 'ERROR').length,
       llmCalls: spans.filter((s) => s.kind === 'llm').length,
       toolCalls: spans.filter((s) => s.kind === 'tool').length,
-      tokens: spans.reduce((n, s) => n + (Number(s.tokens?.total) || 0), 0),
-      costUsd: estimateTraceCost(spans),
+      tokens: billable.reduce((n, s) => n + (Number(s.tokens?.total) || 0), 0),
+      costUsd: estimateTraceCost(billable),
     };
   }
 

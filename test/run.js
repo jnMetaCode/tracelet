@@ -8,6 +8,8 @@ import { parseOtlp } from '../src/otlp.js';
 import { decodeTraces } from '../src/otlp-protobuf.js';
 import { store } from '../src/store.js';
 import { startServer } from '../src/server.js';
+import { diffTraces, stepKey } from '../src/diff.js';
+import { tracelet as aiSdkTracelet } from '../src/ai-sdk.js';
 
 // Golden OTLP/protobuf payload, encoded by protobufjs against the official
 // opentelemetry-proto field numbers (see test/gen-fixture.mjs). Decoding this
@@ -470,5 +472,249 @@ test('--persist: unreadable history file degrades gracefully, server-side state 
   fs.chmodSync(file, 0o600);
   store.persistFile = null;
   fs.rmSync(path.dirname(file), { recursive: true, force: true });
+  store.clear();
+});
+
+// ------------------------------------------------------------------ diff ---
+// Build a trace detail (the shape store.detail() returns) from a step list.
+function fakeRun(traceId, steps) {
+  const spans = steps.map((st, n) => ({
+    traceId,
+    spanId: `${traceId.slice(0, 2)}${n}`,
+    parentSpanId: n === 0 ? null : `${traceId.slice(0, 2)}0`,
+    name: st.name,
+    kind: st.kind,
+    start: 1000 + n * 100,
+    end: 1000 + n * 100 + (st.dur ?? 50),
+    durationMs: st.dur ?? 50,
+    status: st.status || 'OK',
+    statusMessage: '',
+    tokens: st.tokens,
+    io: st.io || {},
+    attributes: {},
+  }));
+  return {
+    traceId,
+    name: steps[0].name,
+    start: 1000,
+    end: 1000 + steps.length * 100,
+    durationMs: steps.length * 100,
+    spanCount: spans.length,
+    errorCount: spans.filter((s) => s.status === 'ERROR').length,
+    llmCalls: spans.filter((s) => s.kind === 'llm').length,
+    toolCalls: spans.filter((s) => s.kind === 'tool').length,
+    tokens: spans.reduce((n, s) => n + (s.tokens?.total || 0), 0),
+    costUsd: null,
+    spans,
+  };
+}
+const AGENT = { name: 'agent.run', kind: 'agent' };
+const LLM = (model, extra = {}) => ({ name: 'ai.generateText', kind: 'llm', tokens: { input: 10, output: 5, total: 15 }, ...extra, io: { model, ...extra.io } });
+const TOOL = (toolName, extra = {}) => ({ name: 'ai.toolCall', kind: 'tool', ...extra, io: { toolName, ...extra.io } });
+
+test('diff: identical runs → every step "same", zero deltas', () => {
+  const a = fakeRun('aa'.repeat(16), [AGENT, LLM('gpt-4o'), TOOL('search')]);
+  const b = fakeRun('bb'.repeat(16), [AGENT, LLM('gpt-4o'), TOOL('search')]);
+  const d = diffTraces(a, b);
+  assert.deepEqual(d.counts, { same: 3, changed: 0, added: 0, removed: 0 });
+  assert.equal(d.delta.durationMs, 0);
+  assert.equal(d.delta.tokens, 0);
+  assert.equal(d.rows.every((r) => r.type === 'same'), true);
+});
+
+test('diff: an inserted retry is one "added" row, later steps stay aligned', () => {
+  const a = fakeRun('aa'.repeat(16), [AGENT, LLM('gpt-4o'), TOOL('search'), LLM('gpt-4o')]);
+  const b = fakeRun('bb'.repeat(16), [AGENT, LLM('gpt-4o'), TOOL('search'), TOOL('search'), LLM('gpt-4o')]);
+  const d = diffTraces(a, b);
+  assert.deepEqual(d.rows.map((r) => r.type), ['same', 'same', 'same', 'added', 'same']);
+  assert.equal(d.rows[3].a, null);
+  assert.equal(d.rows[3].b.label, 'search');
+  assert.equal(d.delta.spanCount, 1);
+  assert.equal(d.delta.toolCalls, 1);
+});
+
+test('diff: a dropped tool call is "removed"; the diff is symmetric', () => {
+  const a = fakeRun('aa'.repeat(16), [AGENT, TOOL('search'), TOOL('calendar'), LLM('gpt-4o')]);
+  const b = fakeRun('bb'.repeat(16), [AGENT, TOOL('search'), LLM('gpt-4o')]);
+  assert.deepEqual(diffTraces(a, b).rows.map((r) => r.type), ['same', 'same', 'removed', 'same']);
+  assert.deepEqual(diffTraces(b, a).rows.map((r) => r.type), ['same', 'same', 'added', 'same']);
+});
+
+test('diff: same step with a different model/status/prompt is "changed" (not removed+added)', () => {
+  const a = fakeRun('aa'.repeat(16), [
+    AGENT,
+    LLM('claude-sonnet-4.5', { io: { input: 'hello', output: 'hi' } }),
+    TOOL('calendar', { status: 'ERROR' }),
+  ]);
+  const b = fakeRun('bb'.repeat(16), [
+    AGENT,
+    LLM('claude-haiku-4-5', { io: { input: 'hello there', output: 'hi' } }),
+    TOOL('calendar', { status: 'OK', io: { output: '{"events":[]}' } }),
+  ]);
+  const d = diffTraces(a, b);
+  assert.deepEqual(d.rows.map((r) => r.type), ['same', 'changed', 'changed']);
+  assert.deepEqual(d.rows[1].changes, ['model', 'input']);
+  assert.deepEqual(d.rows[2].changes, ['status', 'output']);
+  assert.equal(d.delta.errorCount, -1);
+  // model rides along in the compact step so the UI can render "A → B"
+  assert.equal(d.rows[1].a.model, 'claude-sonnet-4.5');
+  assert.equal(d.rows[1].b.model, 'claude-haiku-4-5');
+  // priced per side from the model actually used
+  assert.ok(d.rows[1].a.costUsd > d.rows[1].b.costUsd);
+});
+
+test('diff: JSON payloads compare by content, not by string/object encoding', () => {
+  const a = fakeRun('aa'.repeat(16), [AGENT, TOOL('search', { io: { input: '{"q":"sf"}' } })]);
+  const b = fakeRun('bb'.repeat(16), [AGENT, TOOL('search', { io: { input: { q: 'sf' } } })]);
+  assert.equal(diffTraces(a, b).rows[1].type, 'same');
+  assert.equal(stepKey(a.spans[1]), 'tool:search');
+});
+
+test('diff: cost delta is unknown unless both runs could be priced', () => {
+  const a = fakeRun('aa'.repeat(16), [AGENT, LLM('gpt-4o')]);
+  const b = fakeRun('bb'.repeat(16), [AGENT, LLM('gpt-4o')]);
+  a.costUsd = 0.01;
+  assert.equal(diffTraces(a, b).delta.costUsd, null);
+  b.costUsd = 0.004;
+  assert.ok(Math.abs(diffTraces(a, b).delta.costUsd - -0.006) < 1e-12);
+});
+
+test('HTTP: /api/diff compares two ingested runs; 404 when a side is unknown', async (t) => {
+  const PORT = 4398;
+  const UI = 4399;
+  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => { ingest.close(); ui.close(); });
+  await req(UI, 'POST', '/api/clear');
+
+  const run = (tid, calendarStatus) =>
+    envelope([
+      baseSpan({ traceId: tid, spanId: 'r0', name: 'agent.run', attributes: [{ key: 'openinference.span.kind', value: s('AGENT') }] }),
+      baseSpan({
+        traceId: tid, spanId: 'r1', parentSpanId: 'r0', name: 'ai.toolCall', status: { code: calendarStatus },
+        attributes: [{ key: 'tool.name', value: s('get_calendar') }],
+      }),
+    ]);
+  const A = 'a'.repeat(32), B = 'b'.repeat(32);
+  await req(PORT, 'POST', '/v1/traces', run(A, 2), { 'content-type': 'application/json' });
+  await req(PORT, 'POST', '/v1/traces', run(B, 1), { 'content-type': 'application/json' });
+
+  const ok = await req(UI, 'GET', `/api/diff?a=${A}&b=${B}`);
+  assert.equal(ok.status, 200);
+  const d = JSON.parse(ok.body);
+  assert.equal(d.a.traceId, A);
+  assert.equal(d.delta.errorCount, -1);
+  assert.deepEqual(d.rows.map((r) => r.type), ['same', 'changed']);
+  assert.deepEqual(d.rows[1].changes, ['status']);
+
+  const nf = await req(UI, 'GET', `/api/diff?a=${A}&b=nope`);
+  assert.equal(nf.status, 404);
+  await req(UI, 'POST', '/api/clear');
+});
+
+// ---------------------------------------------------------- ai-sdk wiring ---
+// Drive the AI SDK v7 telemetry-integration callbacks with synthetic events
+// (the shapes `ai` emits) and check the OTLP we POST parses into the spans the
+// UI expects. No `ai` dependency needed for this.
+function fakeFetch() {
+  const calls = [];
+  const fn = async (url, init) => {
+    calls.push({ url, body: JSON.parse(init.body) });
+    return { ok: true };
+  };
+  fn.calls = calls;
+  return fn;
+}
+const V7_USAGE = { inputTokens: 310, outputTokens: 48, totalTokens: 358, inputTokenDetails: {}, outputTokenDetails: {} };
+
+test('ai-sdk integration: root/agent + chat + tool spans with prompts, args, results, usage', async () => {
+  const f = fakeFetch();
+  const integ = aiSdkTracelet({ url: 'http://x/v1/traces', serviceName: 'svc', fetch: f, flushMs: 5 });
+  const callId = 'c1';
+  integ.onStart({ callId, operationId: 'ai.generateText', provider: 'anthropic', modelId: 'claude-sonnet-4.5',
+    messages: [{ role: 'user', content: 'weather?' }], instructions: 'be brief', functionId: 'weather-agent' });
+  integ.onLanguageModelCallStart({ callId, provider: 'anthropic', modelId: 'claude-sonnet-4.5', messages: [{ role: 'user', content: 'weather?' }], tools: [{ name: 'get_weather' }] });
+  integ.onLanguageModelCallEnd({ callId, provider: 'anthropic', modelId: 'claude-sonnet-4.5', finishReason: 'tool-calls', usage: V7_USAGE,
+    content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'get_weather', input: { city: 'SF' } }], responseId: 'r1' });
+  integ.onToolExecutionStart({ callId, toolCall: { toolCallId: 'tc1', toolName: 'get_weather', input: { city: 'SF' } } });
+  integ.onToolExecutionEnd({ callId, toolCall: { toolCallId: 'tc1', toolName: 'get_weather' }, toolOutput: { type: 'tool-result', output: { tempC: 14 } }, toolExecutionMs: 3 });
+  integ.onEnd({ callId, text: 'foggy', finishReason: 'stop', totalUsage: { inputTokens: 310, outputTokens: 48 } });
+  await integ.flush();
+
+  assert.equal(f.calls.length, 1);
+  assert.equal(f.calls[0].url, 'http://x/v1/traces');
+  const spans = parseOtlp(f.calls[0].body);
+  assert.equal(spans.length, 3);
+  assert.equal(spans[0].service, 'svc');
+  const root = spans.find((s) => s.name === 'ai.generateText');
+  const chat = spans.find((s) => s.name.startsWith('chat '));
+  const tool = spans.find((s) => s.name === 'ai.toolCall');
+  assert.equal(root.kind, 'agent'); // gen_ai.operation.name = invoke_agent
+  assert.equal(root.parentSpanId, null);
+  assert.equal(root.io.output, 'foggy');
+  assert.match(root.io.input, /weather\?/);
+  assert.equal(chat.kind, 'llm');
+  assert.equal(chat.parentSpanId, root.spanId);
+  assert.equal(chat.io.model, 'claude-sonnet-4.5');
+  assert.equal(chat.io.system, 'anthropic');
+  assert.deepEqual(chat.tokens, { input: 310, output: 48, total: 358 });
+  assert.match(chat.io.output, /tool-call/);
+  assert.equal(tool.kind, 'tool');
+  assert.equal(tool.io.toolName, 'get_weather');
+  assert.equal(JSON.parse(tool.io.input).city, 'SF');
+  assert.equal(JSON.parse(tool.io.output).tempC, 14);
+  assert.equal(tool.status, 'OK');
+  // every span shares the trace and is time-bounded
+  assert.ok(spans.every((s) => s.traceId === root.traceId && Number.isFinite(s.start) && Number.isFinite(s.end)));
+});
+
+test('ai-sdk integration: recordInputs/recordOutputs=false strip content; tool errors and run errors mark spans', async () => {
+  const f = fakeFetch();
+  const integ = aiSdkTracelet({ url: 'http://x', fetch: f, flushMs: 5 });
+  const callId = 'c2';
+  integ.onStart({ callId, operationId: 'ai.streamText', provider: 'openai', modelId: 'gpt-4o', messages: [{ role: 'user', content: 'secret' }], recordInputs: false, recordOutputs: false });
+  integ.onLanguageModelCallStart({ callId, provider: 'openai', modelId: 'gpt-4o', messages: [{ role: 'user', content: 'secret' }], recordInputs: false, recordOutputs: false });
+  integ.onLanguageModelCallEnd({ callId, provider: 'openai', modelId: 'gpt-4o', usage: V7_USAGE, content: [{ type: 'text', text: 'leak' }], recordInputs: false, recordOutputs: false });
+  integ.onToolExecutionStart({ callId, toolCall: { toolCallId: 't', toolName: 'db', input: { q: 'x' } } });
+  integ.onToolExecutionEnd({ callId, toolCall: { toolCallId: 't' }, toolOutput: { type: 'tool-error', error: new Error('boom') } });
+  integ.onError({ callId, error: new Error('run failed') });
+  await integ.flush();
+  const spans = parseOtlp(f.calls[0].body);
+  const raw = JSON.stringify(f.calls[0].body);
+  assert.ok(!raw.includes('secret') && !raw.includes('leak'), 'content must not be exported');
+  const tool = spans.find((s) => s.name === 'ai.toolCall');
+  assert.equal(tool.status, 'ERROR');
+  assert.equal(tool.statusMessage, 'boom');
+  const root = spans.find((s) => s.name === 'ai.streamText');
+  assert.equal(root.status, 'ERROR');
+  assert.equal(root.statusMessage, 'run failed');
+  assert.deepEqual(spans.find((s) => s.kind === 'llm').tokens, { input: 310, output: 48, total: 358 });
+});
+
+test('ai-sdk integration: a failed POST warns once and never throws', async () => {
+  const integ = aiSdkTracelet({ url: 'http://x', fetch: async () => { throw new Error('ECONNREFUSED'); }, flushMs: 5 });
+  const warn = console.warn; let warned = 0; console.warn = () => warned++;
+  try {
+    for (const id of ['a', 'b']) { integ.onStart({ callId: id, operationId: 'ai.generateText' }); integ.onEnd({ callId: id }); await integ.flush(); }
+  } finally { console.warn = warn; }
+  assert.equal(warned, 1);
+});
+
+test('store: token totals count only the innermost token-bearing spans (no wrapper double count)', () => {
+  store.clear();
+  const tid = 'dd'.repeat(16);
+  const usage = [
+    { key: 'gen_ai.usage.input_tokens', value: iv(100) },
+    { key: 'gen_ai.usage.output_tokens', value: iv(10) },
+    { key: 'gen_ai.request.model', value: s('gpt-4o') },
+  ];
+  store.addSpans(parseOtlp(envelope([
+    baseSpan({ traceId: tid, spanId: 'root', name: 'ai.generateText', attributes: usage }), // wrapper reports the total…
+    baseSpan({ traceId: tid, spanId: 'll1', parentSpanId: 'root', name: 'chat gpt-4o', attributes: usage }), // …and so does the real call
+    baseSpan({ traceId: tid, spanId: 'll2', parentSpanId: 'root', name: 'chat gpt-4o', attributes: usage }),
+  ])));
+  const sum = store.summary(tid);
+  assert.equal(sum.tokens, 220); // two model calls, wrapper excluded
+  assert.ok(Math.abs(sum.costUsd - 2 * (100 * 2.5 + 10 * 10) / 1e6) < 1e-12);
   store.clear();
 });

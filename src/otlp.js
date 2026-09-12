@@ -42,11 +42,24 @@ const first = (obj, keys) => {
   return undefined;
 };
 
+// OTel GenAI semconv `gen_ai.operation.name` values → our kinds.
+const GENAI_OP_KIND = {
+  invoke_agent: 'agent',
+  create_agent: 'agent',
+  execute_tool: 'tool',
+  chat: 'llm',
+  text_completion: 'llm',
+  generate_content: 'llm',
+  embeddings: 'embedding',
+};
+
 function detectKind(name, attrs) {
   const oi = (attrs['openinference.span.kind'] || '').toString().toLowerCase();
   if (oi) return oi; // llm | tool | chain | retriever | agent | embedding | reranker
+  const op = GENAI_OP_KIND[(attrs['gen_ai.operation.name'] || '').toString().toLowerCase()];
+  if (op) return op;
   const n = (name || '').toLowerCase();
-  if (attrs['gen_ai.system'] || attrs['gen_ai.request.model'] || attrs['ai.model.id']) {
+  if (attrs['gen_ai.system'] || attrs['gen_ai.provider.name'] || attrs['gen_ai.request.model'] || attrs['ai.model.id']) {
     if (attrs['tool.name'] || attrs['ai.toolCall.name'] || n.includes('toolcall')) return 'tool';
     return 'llm';
   }
@@ -101,7 +114,7 @@ function reassembleMessages(attrs, prefix) {
 function extractIO(kind, attrs, events) {
   const io = {};
   io.model = first(attrs, ['gen_ai.request.model', 'ai.model.id', 'llm.model_name', 'gen_ai.response.model']);
-  io.system = first(attrs, ['gen_ai.system', 'ai.model.provider', 'llm.provider']);
+  io.system = first(attrs, ['gen_ai.system', 'gen_ai.provider.name', 'ai.model.provider', 'llm.provider']);
 
   // Prompt / input — three overlapping vocabularies, plus OpenInference's
   // flattened indexed messages, plus a fallback to span events (older GenAI
@@ -114,6 +127,7 @@ function extractIO(kind, attrs, events) {
       'ai.prompt.messages',
       'input.value',
       'tool.arguments',
+      'gen_ai.tool.call.arguments',
       'ai.toolCall.args',
     ]) ?? reassembleMessages(attrs, 'llm.input_messages');
   io.system_instructions = attrs['gen_ai.system_instructions'];
@@ -126,6 +140,7 @@ function extractIO(kind, attrs, events) {
       'ai.response.toolCalls',
       'output.value',
       'ai.toolCall.result',
+      'gen_ai.tool.call.result',
       'tool.result',
     ]) ?? reassembleMessages(attrs, 'llm.output_messages');
 
