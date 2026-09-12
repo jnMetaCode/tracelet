@@ -30,6 +30,12 @@ All notable changes to this project are documented here. The format follows
   that arrives is compared against it automatically. Survives reloads (and
   restarts with `--persist`).
 - `examples/mastra.md` — wiring Mastra's `@mastra/otel-exporter` to tracelet.
+- **`@jnmetacode/tracelet/langchain`** — a zero-dependency LangChain.js /
+  LangGraph.js callback handler: `{ callbacks: [tracelet()] }` streams the run
+  tree (agent → graph node → chat / tool) with prompts, tool args/results,
+  usage and errors. LangGraph's hidden plumbing runs are folded away. Honors
+  `recordInputs` / `recordOutputs`. Verified against `langchain@1.x`
+  `createAgent`. (Integrations share one OTLP emitter, `src/emit.js`.)
 
 ### Fixed
 - Trace token and cost totals no longer double-count when a wrapper span

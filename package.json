@@ -11,7 +11,8 @@
     ".": "./src/server.js",
     "./ai-sdk": "./src/ai-sdk.js",
     "./ai-sdk/register": "./src/ai-sdk-register.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./langchain": "./src/langchain.js"
   },
   "scripts": {
     "start": "node src/cli.js",
@@ -45,7 +46,11 @@
     "local-first",
     "debugging",
     "langchain",
-    "vercel-ai-sdk"
+    "vercel-ai-sdk",
+    "langgraph",
+    "ai-sdk",
+    "compare",
+    "diff"
   ],
   "engines": {
     "node": ">=18"

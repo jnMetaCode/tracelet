@@ -41,10 +41,11 @@ npx @jnmetacode/tracelet & sleep 1 && node examples/demo.js
 node examples/demo.js --compare
 ```
 
-用的是 **Vercel AI SDK（v7+）**？一行 import，不用装任何 OpenTelemetry 包：
+用的是 **Vercel AI SDK（v7+）** 或 **LangChain.js**？一行，不用装任何 OpenTelemetry 包：
 
 ```js
-import '@jnmetacode/tracelet/ai-sdk/register'; // 放在入口文件最顶部
+import '@jnmetacode/tracelet/ai-sdk/register';                       // AI SDK：放在入口文件最顶部
+await agent.invoke(input, { callbacks: [tracelet()] });               // LangChain：来自 '@jnmetacode/tracelet/langchain'
 ```
 
 其他框架：把 agent 的 OpenTelemetry exporter 指向摄取端点：
@@ -87,6 +88,7 @@ tracelet 同时理解三套常见的追踪语义约定，无论 trace 是谁发�
 | **Vercel AI SDK v7+** | **一行、零额外依赖：** `import '@jnmetacode/tracelet/ai-sdk/register'`。见 [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md)。 |
 | **Vercel AI SDK v5/v6** | `experimental_telemetry: { isEnabled: true }` → OTLP 导出到 `localhost:4318`。同一篇文档。 |
 | **Python OTel SDK**（LangChain、CrewAI、OpenAI Agents SDK……） | 标准 exporter 原样可用（含 protobuf）。见 [`examples/python-opentelemetry`](examples/python-opentelemetry.md)。 |
+| **LangChain.js / LangGraph.js** | **一行、零额外依赖：** `{ callbacks: [tracelet()] }`，来自 `@jnmetacode/tracelet/langchain`。见 [`examples/langchain`](examples/langchain.md)。 |
 | **Mastra** | `@mastra/otel-exporter` 的 `custom` endpoint 指向 `localhost:4318`。见 [`examples/mastra`](examples/mastra.md)。 |
 | **OpenInference**（LangChain、LlamaIndex、CrewAI…） | 任何导出 OTLP 的 OpenInference instrumentor。 |
 | **OpenTelemetry GenAI** 语义约定 | 原生 `gen_ai.*` span，内容在属性*或*事件里都行。 |
@@ -148,7 +150,7 @@ npx @jnmetacode/tracelet [选项]
 - [ ] 瀑布图火焰缩放
 - [x] Vercel AI SDK 一行接入（`@jnmetacode/tracelet/ai-sdk`，零依赖）——已完成
 - [x] Mastra：纯配置接入 `@mastra/otel-exporter`（`examples/mastra.md`）
-- [ ] 一行接入：LangChain.js
+- [x] LangChain.js / LangGraph.js 一行接入（`@jnmetacode/tracelet/langchain`，零依赖）——已完成
 
 欢迎 PR。项目尚早——issue 和想法是当前最有价值的贡献。
 

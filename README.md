@@ -43,10 +43,11 @@ npx @jnmetacode/tracelet & sleep 1 && node examples/demo.js
 node examples/demo.js --compare
 ```
 
-Using the **Vercel AI SDK (v7+)**? One import, no OpenTelemetry packages:
+Using the **Vercel AI SDK (v7+)** or **LangChain.js**? One line, no OpenTelemetry packages:
 
 ```js
-import '@jnmetacode/tracelet/ai-sdk/register'; // top of your entry file
+import '@jnmetacode/tracelet/ai-sdk/register';                       // AI SDK: top of your entry file
+await agent.invoke(input, { callbacks: [tracelet()] });               // LangChain: from '@jnmetacode/tracelet/langchain'
 ```
 
 Anything else: point your agent's OpenTelemetry exporter at the ingest endpoint:
@@ -92,6 +93,7 @@ tracelet speaks the three common tracing vocabularies on the same spans, so it
 | **Vercel AI SDK v7+** | **One line, zero extra packages:** `import '@jnmetacode/tracelet/ai-sdk/register'`. See [`examples/vercel-ai-sdk`](examples/vercel-ai-sdk.md). |
 | **Vercel AI SDK v5/v6** | `experimental_telemetry: { isEnabled: true }` → export OTLP to `localhost:4318`. Same doc. |
 | **Python OTel SDK** (LangChain, CrewAI, OpenAI Agents SDK…) | The standard exporter works as-is (protobuf included). See [`examples/python-opentelemetry`](examples/python-opentelemetry.md). |
+| **LangChain.js / LangGraph.js** | **One line, zero extra packages:** `{ callbacks: [tracelet()] }` from `@jnmetacode/tracelet/langchain`. See [`examples/langchain`](examples/langchain.md). |
 | **Mastra** | `@mastra/otel-exporter` with a `custom` endpoint of `localhost:4318`. See [`examples/mastra`](examples/mastra.md). |
 | **OpenInference** (LangChain, LlamaIndex, CrewAI…) | Any OpenInference instrumentor exporting OTLP. |
 | **OpenTelemetry GenAI** semconv | Native `gen_ai.*` spans, content as attributes *or* events. |
@@ -157,7 +159,7 @@ npx @jnmetacode/tracelet [options]
 - [ ] Trace list: search inside prompts/outputs, filter by model/tool
 - [x] One-line wrapper for the Vercel AI SDK (`@jnmetacode/tracelet/ai-sdk`, zero deps) — done
 - [x] Mastra: config-only wiring via `@mastra/otel-exporter` (`examples/mastra.md`)
-- [ ] One-line wrapper: LangChain.js
+- [x] One-line wrapper for LangChain.js / LangGraph.js (`@jnmetacode/tracelet/langchain`, zero deps) — done
 
 PRs welcome. This is early — issues and ideas are the most useful contribution
 right now.

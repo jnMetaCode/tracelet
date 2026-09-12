@@ -10,6 +10,7 @@ import { store } from '../src/store.js';
 import { startServer } from '../src/server.js';
 import { diffTraces, stepKey } from '../src/diff.js';
 import { tracelet as aiSdkTracelet } from '../src/ai-sdk.js';
+import { tracelet as lcTracelet } from '../src/langchain.js';
 
 // Golden OTLP/protobuf payload, encoded by protobufjs against the official
 // opentelemetry-proto field numbers (see test/gen-fixture.mjs). Decoding this
@@ -717,4 +718,81 @@ test('store: token totals count only the innermost token-bearing spans (no wrapp
   assert.equal(sum.tokens, 220); // two model calls, wrapper excluded
   assert.ok(Math.abs(sum.costUsd - 2 * (100 * 2.5 + 10 * 10) / 1e6) < 1e-12);
   store.clear();
+});
+
+// -------------------------------------------------------- langchain wiring ---
+// Drive the handler with the argument order @langchain/core's CallbackManager
+// uses at runtime (parentRunId 4th for chains/tools/models).
+const SER = (cls) => ({ lc: 1, type: 'constructor', id: ['langchain', 'x', cls], kwargs: {} });
+const AIMsg = (content, extra = {}) => ({ _getType: () => 'ai', content, ...extra });
+
+test('langchain handler: agent → node → chat/tool tree, hidden & anonymous runnables transparent, usage read', async () => {
+  const f = fakeFetch();
+  const h = lcTracelet({ url: 'http://x', serviceName: 'lc', fetch: f, flushMs: 5 });
+  // root graph
+  h.handleChainStart(SER('CompiledStateGraph'), { messages: ['hi'] }, 'root', undefined, [], {}, undefined, 'LangGraph');
+  // hidden LangGraph plumbing under root → transparent
+  h.handleChainStart(SER('RunnableSequence'), {}, 'hidden', 'root', ['graph:step:0', 'langsmith:hidden'], {}, undefined, '__start__');
+  h.handleChainEnd({}, 'hidden', 'root');
+  // visible node
+  h.handleChainStart(SER('RunnableSequence'), { messages: ['hi'] }, 'node1', 'root', ['graph:step:1'], {}, undefined, 'model_request');
+  // model call under the node; ls_* metadata is how real models report themselves
+  h.handleChatModelStart(SER('ChatAnthropic'), [[{ _getType: () => 'human', content: 'hi' }]], 'llm1', 'node1',
+    { invocation_params: { model: 'claude-sonnet-4.5', tools: [{ name: 'get_weather' }] } }, [], { ls_model_name: 'claude-sonnet-4.5', ls_provider: 'anthropic' });
+  h.handleLLMEnd({ generations: [[{ text: '', message: AIMsg('', { tool_calls: [{ name: 'get_weather', args: { city: 'SF' }, id: 'tc1' }], usage_metadata: { input_tokens: 300, output_tokens: 40, total_tokens: 340 } }) }]], llmOutput: {} }, 'llm1', 'node1');
+  // anonymous routing lambda under the node → transparent; its child attaches to the node
+  h.handleChainStart(SER('RunnableLambda'), {}, 'lambda', 'node1', [], {}, undefined, 'RunnableLambda');
+  h.handleChainEnd({ output: 'Send' }, 'lambda', 'node1');
+  h.handleChainEnd({ output: [] }, 'node1', 'root');
+  // tools node + tool run
+  h.handleChainStart(SER('RunnableSequence'), {}, 'node2', 'root', ['graph:step:2'], {}, undefined, 'tools');
+  h.handleToolStart(SER('DynamicStructuredTool'), '{"city":"SF"}', 'tool1', 'node2', [], {}, 'get_weather', 'tc1');
+  h.handleToolEnd({ _getType: () => 'tool', content: '{"tempC":14}' }, 'tool1', 'node2');
+  h.handleChainEnd({}, 'node2', 'root');
+  h.handleChainEnd({ messages: ['done'] }, 'root', undefined);
+  await h.flush();
+
+  const spans = parseOtlp(f.calls[0].body);
+  const by = (n) => spans.find((s) => s.name === n);
+  assert.deepEqual(spans.map((s) => s.name).sort(), ['LangGraph', 'chat claude-sonnet-4.5', 'execute_tool get_weather', 'model_request', 'tools'].sort());
+  assert.equal(by('LangGraph').kind, 'agent');
+  assert.equal(by('LangGraph').parentSpanId, null);
+  assert.equal(by('model_request').kind, 'chain');
+  assert.equal(by('model_request').parentSpanId, by('LangGraph').spanId);
+  const chat = by('chat claude-sonnet-4.5');
+  assert.equal(chat.kind, 'llm');
+  assert.equal(chat.parentSpanId, by('model_request').spanId);
+  assert.equal(chat.io.model, 'claude-sonnet-4.5');
+  assert.equal(chat.io.system, 'anthropic');
+  assert.deepEqual(chat.tokens, { input: 300, output: 40, total: 340 });
+  assert.match(chat.io.input, /"role":"human"/);
+  assert.match(chat.io.output, /get_weather/);
+  const tool = by('execute_tool get_weather');
+  assert.equal(tool.kind, 'tool');
+  assert.equal(tool.parentSpanId, by('tools').spanId);
+  assert.equal(tool.io.toolName, 'get_weather');
+  assert.equal(JSON.parse(tool.io.input).city, 'SF');
+  assert.equal(JSON.parse(tool.io.output).tempC, 14);
+  assert.ok(spans.every((s) => s.traceId === by('LangGraph').traceId));
+});
+
+test('langchain handler: errors mark spans; recordInputs/Outputs=false strip content; llmOutput.tokenUsage fallback', async () => {
+  const f = fakeFetch();
+  const h = lcTracelet({ url: 'http://x', fetch: f, flushMs: 5, recordInputs: false, recordOutputs: false });
+  h.handleChainStart(SER('AgentExecutor'), { input: 'secret' }, 'r', undefined, [], {}, undefined, 'agent');
+  h.handleLLMStart(SER('OpenAI'), ['secret prompt'], 'l', 'r', { invocation_params: { model: 'gpt-4o' } }, [], {});
+  h.handleLLMEnd({ generations: [[{ text: 'leak' }]], llmOutput: { tokenUsage: { promptTokens: 7, completionTokens: 3 } } }, 'l', 'r');
+  h.handleToolStart(SER('Tool'), 'secret args', 't', 'r', [], {}, 'db', 'tc');
+  h.handleToolError(new Error('db down'), 't', 'r');
+  h.handleChainError(new Error('agent failed'), 'r', undefined);
+  await h.flush();
+  const raw = JSON.stringify(f.calls[0].body);
+  assert.ok(!raw.includes('secret') && !raw.includes('leak'));
+  const spans = parseOtlp(f.calls[0].body);
+  const llm = spans.find((s) => s.kind === 'llm');
+  assert.equal(llm.io.model, 'gpt-4o');
+  assert.deepEqual(llm.tokens, { input: 7, output: 3, total: 10 });
+  assert.equal(spans.find((s) => s.kind === 'tool').status, 'ERROR');
+  assert.equal(spans.find((s) => s.kind === 'tool').statusMessage, 'db down');
+  assert.equal(spans.find((s) => s.kind === 'agent').statusMessage, 'agent failed');
 });

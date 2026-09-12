@@ -22,109 +22,26 @@
 //
 // Honors `experimental_telemetry: { recordInputs: false }` / `recordOutputs: false`.
 
-import { randomBytes } from 'node:crypto';
-
-const DEFAULT_URL = 'http://localhost:4318/v1/traces';
-
-const hex = (bytes) => randomBytes(bytes).toString('hex');
-const nowNs = () => (BigInt(Date.now()) * 1000000n).toString();
-
-// OTLP AnyValue encoding for the handful of types we emit.
-function anyValue(v) {
-  if (typeof v === 'string') return { stringValue: v };
-  if (typeof v === 'boolean') return { boolValue: v };
-  if (typeof v === 'number') return Number.isInteger(v) ? { intValue: String(v) } : { doubleValue: v };
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(anyValue) } };
-  return { stringValue: safeJson(v) };
-}
-
-function safeJson(v) {
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return String(v);
-  }
-}
-
-function toAttributes(obj) {
-  return Object.entries(obj)
-    .filter(([, v]) => v !== undefined && v !== null && v !== '')
-    .map(([key, value]) => ({ key, value: anyValue(value) }));
-}
-
-const errorMessage = (e) => (e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e ?? 'error'));
+import { createExporter, hex, safeJson } from './emit.js';
 
 /**
  * Create an AI SDK telemetry integration that streams spans to tracelet.
  * @param {object} [opts]
- * @param {string} [opts.url]          OTLP/HTTP traces endpoint (default: $TRACELET_URL or localhost:4318)
+ * @param {string} [opts.url]          OTLP/HTTP traces endpoint (default: $TRACELET_URL or http://localhost:4318/v1/traces)
  * @param {string} [opts.serviceName]  `service.name` shown in tracelet (default: 'ai-sdk')
  * @param {number} [opts.flushMs]      batch window before POSTing (default: 100)
  * @param {Function} [opts.fetch]      fetch implementation (tests)
  */
-export function tracelet({
-  url = process.env.TRACELET_URL || DEFAULT_URL,
-  serviceName = process.env.OTEL_SERVICE_NAME || 'ai-sdk',
-  flushMs = 100,
-  fetch: fetchImpl = globalThis.fetch,
-} = {}) {
+export function tracelet(opts = {}) {
+  const x = createExporter({ scope: 'ai-sdk', ...opts });
+  const flush = () => x.flush();
   const calls = new Map(); // callId → per-run state
-  let pending = []; // finished spans waiting to be POSTed
-  let timer = null;
-  let warned = false;
-
-  const queue = (span) => {
-    pending.push(span);
-    if (!timer) {
-      timer = setTimeout(flush, flushMs);
-      timer.unref?.();
-    }
-  };
-
-  async function flush() {
-    clearTimeout(timer);
-    timer = null;
-    if (!pending.length) return;
-    const spans = pending;
-    pending = [];
-    const body = JSON.stringify({
-      resourceSpans: [
-        {
-          resource: { attributes: toAttributes({ 'service.name': serviceName }) },
-          scopeSpans: [{ scope: { name: '@jnmetacode/tracelet/ai-sdk' }, spans }],
-        },
-      ],
-    });
-    try {
-      const res = await fetchImpl(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    } catch (e) {
-      if (!warned) {
-        warned = true;
-        console.warn(`tracelet: could not send traces to ${url} (${errorMessage(e)}). Is it running? npx @jnmetacode/tracelet`);
-      }
-    }
-  }
-
   const state = (callId) => calls.get(callId);
 
   // A span is "open" while it has a start but no end; `finish` seals and queues it.
-  const open = (st, { name, parentSpanId, attrs, kind = 1 }) => ({
-    traceId: st.traceId,
-    spanId: hex(8),
-    parentSpanId: parentSpanId || '',
-    name,
-    kind,
-    startTimeUnixNano: nowNs(),
-    attributes: toAttributes(attrs),
-    status: { code: 0 },
-  });
-  const finish = (span, { attrs = {}, error, endNs } = {}) => {
-    span.endTimeUnixNano = endNs || nowNs();
-    span.attributes.push(...toAttributes(attrs));
-    span.status = error !== undefined ? { code: 2, message: errorMessage(error) } : { code: 1 };
-    queue(span);
-  };
+  const open = (st, { name, parentSpanId, attrs, kind }) =>
+    x.open({ traceId: st.traceId, parentSpanId, name, attrs, kind });
+  const finish = (span, extra) => x.end(span, extra);
 
   const integration = {
     onStart(e) {
@@ -265,8 +182,6 @@ export function tracelet({
     flush,
   };
 
-  // Don't let a short script exit with the last batch still in the timer.
-  process.once?.('beforeExit', () => void flush());
   return integration;
 }
 
