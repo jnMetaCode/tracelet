@@ -14,6 +14,22 @@ const MAX_TRACES = 500; // ring buffer; oldest traces are evicted
 // `ai.generateText` + `ai.generateText.doGenerate` pair). Counting both doubles
 // the trace total, so only the *innermost* token-bearing spans count: a span
 // is skipped when any descendant already carries tokens.
+// Lower-cased searchable text per span, built once (spans are immutable after
+// ingest). A WeakMap keeps it off the span object so it never reaches the API.
+const SEARCH_TEXT = new WeakMap();
+function searchText(span) {
+  let t = SEARCH_TEXT.get(span);
+  if (t !== undefined) return t;
+  const io = span.io || {};
+  const str = (v) => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v));
+  t = [span.name, io.model, io.toolName, io.input, io.output, io.system_instructions, span.statusMessage]
+    .map(str)
+    .join('\n')
+    .toLowerCase();
+  SEARCH_TEXT.set(span, t);
+  return t;
+}
+
 function tokenLeaves(spans) {
   const parentOf = new Map(spans.map((s) => [s.spanId, s.parentSpanId]));
   const hasTokenChild = new Set();
@@ -142,22 +158,10 @@ class Store {
     const needle = String(q || '').trim().toLowerCase();
     const out = {};
     if (!needle) return out;
-    const text = (v) => (v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v)).toLowerCase();
     for (const id of [...this.order].reverse()) {
       const t = this.traces.get(id);
       const hits = [];
-      for (const s of t.spans.values()) {
-        const io = s.io || {};
-        if (
-          text(s.name).includes(needle) ||
-          text(io.model).includes(needle) ||
-          text(io.toolName).includes(needle) ||
-          text(io.input).includes(needle) ||
-          text(io.output).includes(needle) ||
-          text(io.system_instructions).includes(needle) ||
-          text(s.statusMessage).includes(needle)
-        ) hits.push(s.spanId);
-      }
+      for (const s of t.spans.values()) if (searchText(s).includes(needle)) hits.push(s.spanId);
       if (hits.length) out[id] = hits;
     }
     return out;

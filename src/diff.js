@@ -71,9 +71,14 @@ function compact(span, depth) {
   };
 }
 
+// The DP table is (n+1)·(m+1) Uint16s. Beyond ~4M cells (≈2000×2000 steps) fall
+// back to a greedy in-order match so a pair of huge traces can't eat memory.
+const LCS_MAX_CELLS = 4_000_000;
+
 /** Classic LCS over step keys → list of [i, j] matched index pairs. */
 function lcsPairs(ka, kb) {
   const n = ka.length, m = kb.length;
+  if ((n + 1) * (m + 1) > LCS_MAX_CELLS) return greedyPairs(ka, kb);
   // dp[i][j] = LCS length of ka[i..] and kb[j..]
   const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
   for (let i = n - 1; i >= 0; i--) {
@@ -89,6 +94,24 @@ function lcsPairs(ka, kb) {
       i++; j++;
     } else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
     else j++;
+  }
+  return pairs;
+}
+
+/** Greedy fallback: for each a[i], the next unmatched b[j] with the same key
+ *  within a small window. Linear in n·window; may miss a few alignments. */
+function greedyPairs(ka, kb, window = 64) {
+  const pairs = [];
+  let j = 0;
+  for (let i = 0; i < ka.length && j < kb.length; i++) {
+    const limit = Math.min(kb.length, j + window);
+    for (let k = j; k < limit; k++) {
+      if (ka[i] === kb[k]) {
+        pairs.push([i, k]);
+        j = k + 1;
+        break;
+      }
+    }
   }
   return pairs;
 }

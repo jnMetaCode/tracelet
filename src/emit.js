@@ -32,6 +32,19 @@ export function toAttributes(obj) {
     .map(([key, value]) => ({ key, value: anyValue(value) }));
 }
 
+// Every exporter created in the process, so one exit hook can flush them all —
+// `{ callbacks: [tracelet()] }` written inline creates one per call and must
+// not add a process listener each time.
+const EXPORTERS = new Set();
+let exitHookInstalled = false;
+function installExitHook() {
+  if (exitHookInstalled || !process.once) return;
+  exitHookInstalled = true;
+  process.once('beforeExit', () => {
+    for (const x of EXPORTERS) void x.flush();
+  });
+}
+
 export const errorMessage = (e) =>
   e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e ?? 'error');
 
@@ -79,10 +92,7 @@ export function createExporter({
     }
   }
 
-  // Don't let a short script exit with the last batch still in the timer.
-  process.once?.('beforeExit', () => void flush());
-
-  return {
+  const exporter = {
     /** Start a span. Not sent until `end`. */
     open({ traceId, parentSpanId, name, attrs = {}, kind = 1 }) {
       return {
@@ -109,4 +119,8 @@ export function createExporter({
     },
     flush,
   };
+  // Don't let a short script exit with the last batch still in the timer.
+  EXPORTERS.add(exporter);
+  installExitHook();
+  return exporter;
 }

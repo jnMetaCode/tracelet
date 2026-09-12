@@ -815,3 +815,34 @@ test('search: matches prompts/outputs/tool payloads/models across traces, case-i
   assert.deepEqual(store.summary(A).tools, ['get_calendar']);
   store.clear();
 });
+
+test('diff: very large traces use the bounded greedy alignment and still line up', () => {
+  const N = 2500; // (N+1)^2 > LCS_MAX_CELLS → greedy path
+  const steps = (extra) => [AGENT, ...Array.from({ length: N }, (_, i) => (i % 2 ? TOOL(`t${i % 7}`) : LLM('gpt-4o'))), ...(extra ? [TOOL('late')] : [])];
+  const a = fakeRun('aa'.repeat(16), steps(false));
+  const b = fakeRun('bb'.repeat(16), steps(true));
+  const d = diffTraces(a, b);
+  assert.equal(d.counts.same, N + 1);
+  assert.equal(d.counts.added, 1);
+  assert.equal(d.rows[d.rows.length - 1].type, 'added');
+});
+
+test('emit: many inline exporters share one beforeExit listener', async () => {
+  const before = process.listenerCount('beforeExit');
+  for (let i = 0; i < 25; i++) lcTracelet({ url: 'http://x', fetch: async () => ({ ok: true }) });
+  for (let i = 0; i < 25; i++) aiSdkTracelet({ url: 'http://x', fetch: async () => ({ ok: true }) });
+  assert.ok(process.listenerCount('beforeExit') - before <= 1);
+});
+
+test('search: repeated queries reuse cached span text (no per-call stringify of big payloads)', () => {
+  store.clear();
+  const tid = 'ef'.repeat(16);
+  const big = 'x'.repeat(200000) + ' needle';
+  store.addSpans(parseOtlp(envelope([baseSpan({ traceId: tid, spanId: 'p1', attributes: [{ key: 'ai.prompt', value: s(big) }] })])));
+  const t0 = performance.now();
+  for (let i = 0; i < 200; i++) store.search('needle');
+  const ms = performance.now() - t0;
+  assert.deepEqual(store.search('needle'), { [tid]: ['p1'] });
+  assert.ok(ms < 500, `200 searches took ${ms.toFixed(0)}ms`);
+  store.clear();
+});

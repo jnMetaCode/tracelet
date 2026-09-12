@@ -19,11 +19,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - name: Syntax check
-        run: |
-          node --check src/cli.js
-          node --check src/server.js
-          node --check src/otlp.js
-          node --check src/otlp-protobuf.js
-          node --check src/store.js
+        shell: bash
+        run: for f in src/*.js public/*.js examples/*.js; do node --check "$f"; done
       - name: Test
         run: npm test

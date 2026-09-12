@@ -555,7 +555,7 @@ function connect() {
     const msg = JSON.parse(e.data);
     if (msg.type === 'clear') {
       state.traces = []; state.selected = null; state.detail = null; state.compare = null; state.picking = false;
-      state.known.clear(); state.baseline = null; saveBaseline(null);
+      state.known.clear(); state.baseline = null; saveBaseline(null); state.hits = {};
       renderList(); renderTree(); return;
     }
     const isNew = msg.traceId && !state.known.has(msg.traceId);
