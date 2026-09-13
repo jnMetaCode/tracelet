@@ -71,9 +71,7 @@ class Store {
             /* skip a torn/corrupt line rather than refusing to start */
           }
         }
-        // Compact: rewrite with only the spans the ring buffer retained.
-        const batches = this.order.map((id) => [...this.traces.get(id).spans.values()]);
-        fs.writeFileSync(file, batches.map((b) => JSON.stringify(b)).join('\n') + (batches.length ? '\n' : ''));
+        this._compact(file);
         this.loadedBatches = loaded;
       }
     } catch (e) {
@@ -82,11 +80,22 @@ class Store {
       console.error(`tracelet: could not load history from ${file}: ${e.message}`);
     }
     this.persistFile = file;
+    this.appendedSinceCompact = 0;
+  }
+
+  /** Rewrite the history file with only the spans the ring buffer retains. */
+  _compact(file) {
+    const batches = this.order.map((id) => [...this.traces.get(id).spans.values()]);
+    fs.writeFileSync(file, batches.map((b) => JSON.stringify(b)).join('\n') + (batches.length ? '\n' : ''));
+    this.appendedSinceCompact = 0;
   }
 
   addSpans(spans) {
     if (this.persistFile && spans.length) {
       try {
+        // Append is cheap; the file is rewritten from the ring buffer once
+        // enough batches have been evicted that it holds more than we keep.
+        if (++this.appendedSinceCompact > (this.persistCompactEvery ?? MAX_TRACES * 2)) this._compact(this.persistFile);
         fs.appendFileSync(this.persistFile, JSON.stringify(spans) + '\n');
       } catch {
         /* persistence is best-effort; never block ingest */

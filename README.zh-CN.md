@@ -134,6 +134,9 @@ tracelet 不打算做你的生产分析仓库。它是你*构建* agent 时开�
   Clear 也会一并清掉文件）。
 - **成本估算。** trace 和 LLM span 会按常见模型（Claude/GPT/Gemini）的公开
   标价显示 `~$` 估算；不认识的模型就不显示——绝不瞎猜。
+- **默认私有。** 两个端口都只绑定 `127.0.0.1`（要暴露请显式 `--host 0.0.0.0`）。
+  UI 的 API 不发 CORS 头，所以同一浏览器里打开的其他网页读不到你的 trace；
+  只有 OTLP 摄取路径接受跨域 POST，给浏览器端 exporter 用。
 
 ## CLI
 
@@ -142,8 +145,19 @@ npx @jnmetacode/tracelet [选项]
   -p, --port <n>      OTLP/HTTP 摄取端口   （默认 4318）
       --ui-port <n>   Web UI 端口          （默认 4321）
       --persist <f>   可选本地历史（JSONL，启动时自动恢复）
+      --host <addr>   绑定地址（默认 127.0.0.1，仅本机；容器内或要暴露给局域网时用 0.0.0.0）
       --no-open       不自动打开浏览器
 ```
+
+### 快捷键
+
+| 键 | |
+| --- | --- |
+| `/` | 聚焦搜索框 |
+| `c` | 选中的运行与另一次运行对比 |
+| `p` | 钉住 / 取消钉住基线 |
+| `Esc` | 取消选择 · 复位缩放 |
+| 双击瀑布图 | 复位缩放 |
 
 ## 路线图
 
@@ -160,8 +174,10 @@ npx @jnmetacode/tracelet [选项]
 
 ## 状态
 
-早期 MVP。摄取 + 实时 UI 今天就能用（跑 `node examples/demo.js` 即可看到）。
-欢迎 Star/Watch 关注进展。
+可以日常使用：实时摄取（protobuf + JSON）、瀑布图 + 检视器、对比 / 基线、搜索、缩放、
+成本估算、可选历史，以及实测过的 Vercel AI SDK、LangChain.js、Mastra 一行接入。
+代码仍然很小（几百行，可通读），并且坚持只在本地。
+带 OTLP 样例的 issue 是最有价值的贡献。
 
 ## 姊妹项目
 

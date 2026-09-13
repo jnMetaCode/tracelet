@@ -44,7 +44,21 @@ All notable changes to this project are documented here. The format follows
 - **Waterfall zoom** — drag a range across the bars to zoom the time axis;
   spans outside the window dim; `Esc`, double-click or the header chip resets.
 
+### Security
+- Both servers bind to `127.0.0.1` by default; `--host <addr>` opts into
+  other interfaces. Previously they listened on all interfaces, so anyone on
+  the LAN could read the UI/API.
+- The UI API no longer sends CORS headers — a web page open in the same
+  browser could previously `fetch` `/api/traces` and read every prompt.
+  `POST /api/clear` requires an `x-tracelet-ui: 1` header (forces a preflight,
+  which cross-origin pages fail). OTLP ingest keeps `Access-Control-Allow-Origin: *`
+  for browser-side exporters.
+
 ### Fixed
+- `--persist` history is compacted during the run (every 1000 appended
+  batches), not only at startup, so a long session can't grow the file past
+  what the 500-trace ring retains.
+- The UI coalesces bursts of span batches into one list refresh per ~80 ms.
 - Trace token and cost totals no longer double-count when a wrapper span
   reports the same usage as the model call beneath it (AI SDK root + `chat`
   child, legacy `ai.generateText` + `.doGenerate`). Only the innermost

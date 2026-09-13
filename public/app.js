@@ -632,38 +632,52 @@ function connect() {
   const es = new EventSource('/api/events');
   es.onopen = () => setLive(true, '● live');
   es.onerror = () => setLive(false, '● reconnecting');
-  es.onmessage = async (e) => {
-    const msg = JSON.parse(e.data);
-    if (msg.type === 'clear') {
-      state.traces = []; state.selected = null; state.detail = null; state.compare = null; state.picking = false;
-      state.known.clear(); state.baseline = null; saveBaseline(null); state.hits = {};
-      renderList(); renderTree(); return;
-    }
-    const isNew = msg.traceId && !state.known.has(msg.traceId);
-    await refreshList();
-    if (isNew && state.baseline && msg.traceId !== state.baseline && state.traces.some((t) => t.traceId === state.baseline)) {
-      // A pinned baseline turns every new run into a regression check.
-      state.selected = state.baseline;
-      await startCompare(state.baseline, msg.traceId);
-      return;
-    }
-    if (state.compare && (msg.traceId === state.compare.a || msg.traceId === state.compare.b)) {
-      // One side is still streaming — recompute the comparison.
-      const { a, b, row } = state.compare;
-      await startCompare(a, b);
-      if (row != null && state.compare?.data.rows[row]) selectDiffRow(row);
-      return;
-    }
-    // If the live trace is the one we're viewing, refresh its tree too.
-    if (msg.traceId && msg.traceId === state.selected) {
-      state.detail = await api(`/api/traces/${encodeURIComponent(msg.traceId)}`);
-      renderTree();
-    }
+  // A burst of span batches (one SSE event each) must not turn into a burst of
+  // /api/traces fetches: events within 80 ms are handled together — one list
+  // refresh, then one detail/compare update per affected run.
+  let queued = [];
+  let flushTimer = null;
+  es.onmessage = (e) => {
+    queued.push(JSON.parse(e.data));
+    if (flushTimer) return;
+    flushTimer = setTimeout(async () => {
+      flushTimer = null;
+      const batch = queued;
+      queued = [];
+      if (batch.some((m) => m.type === 'clear')) {
+        state.traces = []; state.selected = null; state.detail = null; state.compare = null; state.picking = false;
+        state.known.clear(); state.baseline = null; saveBaseline(null); state.hits = {};
+        renderList(); renderTree();
+        return;
+      }
+      const ids = [...new Set(batch.map((m) => m.traceId).filter(Boolean))];
+      const fresh = ids.filter((id) => !state.known.has(id));
+      await refreshList();
+      // A pinned baseline turns the first brand-new run into a regression check.
+      const candidate = fresh.find((id) => id !== state.baseline);
+      if (candidate && state.baseline && state.traces.some((t) => t.traceId === state.baseline)) {
+        state.selected = state.baseline;
+        await startCompare(state.baseline, candidate);
+        return;
+      }
+      if (state.compare && ids.some((id) => id === state.compare.a || id === state.compare.b)) {
+        // One side is still streaming — recompute the comparison once.
+        const { a, b, row } = state.compare;
+        await startCompare(a, b);
+        if (row != null && state.compare?.data.rows[row]) selectDiffRow(row);
+        return;
+      }
+      // If the live trace is the one we're viewing, refresh its tree too.
+      if (state.selected && ids.includes(state.selected)) {
+        state.detail = await api(`/api/traces/${encodeURIComponent(state.selected)}`);
+        renderTree();
+      }
+    }, 80);
   };
 }
 
 // ---- controls ------------------------------------------------------------
-$('#clear').onclick = () => api('/api/clear', { method: 'POST' });
+$('#clear').onclick = () => api('/api/clear', { method: 'POST', headers: { 'x-tracelet-ui': '1' } });
 $('#filter').oninput = (e) => { state.filter = e.target.value; renderList(); runSearch(); };
 $('#errors-only').onchange = (e) => { state.errorsOnly = e.target.checked; renderList(); };
 $('#compare').onclick = () => {

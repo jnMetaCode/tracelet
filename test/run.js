@@ -259,7 +259,7 @@ test('HTTP: ingest → list → detail → clear, plus error paths', async (t) =
   });
 
   // start from a clean store (the parser/store unit tests share the singleton)
-  await req(UI, 'POST', '/api/clear');
+  await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
 
   // valid OTLP ingest (unique trace id so this test is self-contained)
   const tid = 'cccccccccccccccccccccccccccccccc';
@@ -301,7 +301,7 @@ test('HTTP: ingest → list → detail → clear, plus error paths', async (t) =
   assert.match(idx.body, /tracelet/);
 
   // clear empties the store
-  await req(UI, 'POST', '/api/clear');
+  await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
   const after = JSON.parse((await req(UI, 'GET', '/api/traces')).body);
   assert.equal(after.length, 0);
 });
@@ -586,7 +586,7 @@ test('HTTP: /api/diff compares two ingested runs; 404 when a side is unknown', a
   const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
   await new Promise((r) => setTimeout(r, 150));
   t.after(() => { ingest.close(); ui.close(); });
-  await req(UI, 'POST', '/api/clear');
+  await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
 
   const run = (tid, calendarStatus) =>
     envelope([
@@ -610,7 +610,7 @@ test('HTTP: /api/diff compares two ingested runs; 404 when a side is unknown', a
 
   const nf = await req(UI, 'GET', `/api/diff?a=${A}&b=nope`);
   assert.equal(nf.status, 404);
-  await req(UI, 'POST', '/api/clear');
+  await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
 });
 
 // ---------------------------------------------------------- ai-sdk wiring ---
@@ -891,4 +891,58 @@ test('store: a wrapper keeps its usage when children only report 0 tokens', () =
   ])));
   assert.equal(store.summary(tid).tokens, 950);
   store.clear();
+});
+
+// ------------------------------------------------------------- security ---
+test('HTTP: binds loopback by default; /api has no CORS; clear needs the UI header; ingest keeps CORS', async (t) => {
+  const PORT = 4418, UI = 4419;
+  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => { ingest.close(); ui.close(); });
+  assert.equal(ingest.address().address, '127.0.0.1');
+  assert.equal(ui.address().address, '127.0.0.1');
+
+  const api = await new Promise((resolve) => http.get({ host: '127.0.0.1', port: UI, path: '/api/traces', headers: { Origin: 'https://evil.example' } }, (r) => { r.resume(); resolve(r); }));
+  assert.equal(api.headers['access-control-allow-origin'], undefined, '/api must not be CORS-readable');
+
+  const noHeader = await req(UI, 'POST', '/api/clear', '', { Origin: 'https://evil.example' });
+  assert.equal(noHeader.status, 403);
+  const withHeader = await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
+  assert.equal(withHeader.status, 200);
+
+  const pre = await req(PORT, 'OPTIONS', '/v1/traces', '', { Origin: 'https://app.example', 'Access-Control-Request-Method': 'POST' });
+  assert.equal(pre.status, 204);
+  assert.equal(pre.headers['access-control-allow-origin'], '*', 'browser exporters still need CORS on ingest');
+  const ing = await req(PORT, 'POST', '/v1/traces', envelope([baseSpan({ traceId: 'e'.repeat(32) })]), { 'content-type': 'application/json' });
+  assert.equal(ing.headers['access-control-allow-origin'], '*');
+  await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
+});
+
+test('HTTP: --host 0.0.0.0 opts into all interfaces', async (t) => {
+  const { ingest, ui } = startServer({ port: 4428, uiPort: 4429, host: '0.0.0.0', open: false });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => { ingest.close(); ui.close(); });
+  assert.equal(ui.address().address, '0.0.0.0');
+});
+
+test('--persist: the history file is compacted during the run, not only at start', async () => {
+  const { mkdtempSync, readFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const file = join(mkdtempSync(join(tmpdir(), 'tracelet-')), 'h.jsonl');
+  store.clear();
+  store.enablePersist(file);
+  store.persistCompactEvery = 100; // rewrite after every 100 appended batches
+  // 700 one-span traces through a 500-trace ring: 200 get evicted.
+  for (let i = 0; i < 700; i++) {
+    store.addSpans(parseOtlp(envelope([baseSpan({ traceId: String(i).padStart(32, '0'), spanId: 'r' })])));
+  }
+  const lines = readFileSync(file, 'utf8').split('\n').filter(Boolean).length;
+  assert.ok(lines < 700, `without compaction the file would hold 700 batches, has ${lines}`);
+  assert.ok(lines <= 500 + 100, `bounded by ring size + compaction window, has ${lines}`);
+  // and what's on disk is exactly what a restart would restore
+  store.persistFile = null; store.persistCompactEvery = undefined; store.clear();
+  store.enablePersist(file);
+  assert.equal(store.list().length, 500);
+  store.persistFile = null; store.clear();
 });

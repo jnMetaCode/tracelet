@@ -2,12 +2,13 @@
 import { startServer } from './server.js';
 
 function parseArgs(argv) {
-  const args = { port: 4318, uiPort: 4321, open: true };
+  const args = { port: 4318, uiPort: 4321, host: '127.0.0.1', open: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--port' || a === '-p') args.port = Number(argv[++i]);
     else if (a === '--ui-port') args.uiPort = Number(argv[++i]);
     else if (a === '--persist') args.persist = argv[++i];
+    else if (a === '--host') args.host = argv[++i];
     else if (a === '--no-open') args.open = false;
     else if (a === '--help' || a === '-h') args.help = true;
     else if (a === '--version' || a === '-v') args.version = true;
@@ -26,6 +27,8 @@ Options:
       --ui-port <n>   Web UI port (default: 4321)
       --persist <f>   Opt-in local history: append traces to a JSONL file and
                       reload it on start (default: in-memory only)
+      --host <addr>   Bind address (default: 127.0.0.1 — loopback only).
+                      Use 0.0.0.0 inside a container / to expose on the LAN.
       --no-open       Do not auto-open the browser
   -h, --help          Show this help
   -v, --version       Show version
@@ -56,6 +59,10 @@ if (args.version) {
 const validPort = (p) => Number.isInteger(p) && p >= 0 && p <= 65535;
 if (!validPort(args.port) || !validPort(args.uiPort)) {
   console.error('Error: --port and --ui-port must be integers in 0–65535');
+  process.exit(1);
+}
+if (typeof args.host !== 'string' || !args.host.trim()) {
+  console.error('Error: --host needs an address (e.g. 127.0.0.1 or 0.0.0.0)');
   process.exit(1);
 }
 if (args.port === args.uiPort) {

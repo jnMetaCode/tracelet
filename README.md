@@ -145,6 +145,10 @@ your agent ──OTLP/HTTP (pb|json)──▶  :4318  ──▶  in-memory store
 - **Cost estimates.** Traces and LLM spans show a `~$` figure computed from
   published list prices for common models (Claude/GPT/Gemini); unknown models
   simply show none — it never guesses.
+- **Private by default.** Both ports bind to `127.0.0.1` (use `--host 0.0.0.0`
+  to expose them deliberately). The UI API sends no CORS headers, so a web page
+  open in the same browser cannot read your traces; only the OTLP ingest path
+  accepts cross-origin POSTs, for browser-side exporters.
 
 ## CLI
 
@@ -153,8 +157,20 @@ npx @jnmetacode/tracelet [options]
   -p, --port <n>      OTLP/HTTP ingest port   (default 4318)
       --ui-port <n>   Web UI port             (default 4321)
       --persist <f>   opt-in local history (JSONL; reloaded on start)
+      --host <addr>   bind address (default 127.0.0.1 — loopback only;
+                      0.0.0.0 to expose, e.g. inside a container)
       --no-open       don't auto-open browser
 ```
+
+### Keyboard
+
+| Key | |
+| --- | --- |
+| `/` | focus search |
+| `c` | compare the selected run with another |
+| `p` | pin / unpin the selected run as baseline |
+| `Esc` | cancel picking · reset zoom |
+| double-click waterfall | reset zoom |
 
 ## Roadmap
 
@@ -173,8 +189,11 @@ right now.
 
 ## Status
 
-Early MVP. The ingest + live UI work today (`node examples/demo.js` to see it).
-Star/watch to follow along.
+Usable daily: live ingest (protobuf + JSON), waterfall + inspector, Compare /
+baseline, search, zoom, cost estimates, opt-in history, and verified one-line
+integrations for the Vercel AI SDK, LangChain.js and Mastra. Still small (a
+few hundred lines you can read) and still opinionated about staying local.
+Issues with a sample OTLP payload are the most useful contribution.
 
 ## Sibling projects
 

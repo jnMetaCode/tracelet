@@ -37,15 +37,26 @@ function readBody(req, limitBytes = 50 * 1024 * 1024) {
   });
 }
 
-function send(res, code, body, type = 'application/json') {
-  res.writeHead(code, {
-    'Content-Type': type,
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  });
+// CORS is granted ONLY to the OTLP ingest path: browser-side OTel exporters
+// POST cross-origin and need it. The UI API (/api/*) deliberately sends no
+// Access-Control-* headers — otherwise any web page open in the same browser
+// could fetch http://localhost:4321/api/traces and read every prompt.
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Methods': 'POST,OPTIONS',
+};
+
+function send(res, code, body, type = 'application/json', extraHeaders = {}) {
+  res.writeHead(code, { 'Content-Type': type, ...extraHeaders });
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
+
+// State-changing UI endpoints require a custom header. Cross-origin, a custom
+// header forces a CORS preflight, which fails (no CORS on /api), so a hostile
+// page can't e.g. POST /api/clear as a "simple request".
+const UI_HEADER = 'x-tracelet-ui';
+const fromUi = (req) => req.headers[UI_HEADER] === '1';
 
 // ---- OTLP ingest handler (shared by ingest + UI servers) -----------------
 async function handleTraces(req, res) {
@@ -61,9 +72,9 @@ async function handleTraces(req, res) {
     const spans = parseOtlp(json);
     if (spans.length) store.addSpans(spans);
     // OTLP expects an ExportTraceServiceResponse (empty object = success).
-    return send(res, 200, {});
+    return send(res, 200, {}, 'application/json', CORS);
   } catch (err) {
-    return send(res, 400, { error: String(err && err.message) });
+    return send(res, 400, { error: String(err && err.message) }, 'application/json', CORS);
   }
 }
 
@@ -85,10 +96,12 @@ function handleUi(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const path = url.pathname;
 
-  if (req.method === 'OPTIONS') return send(res, 204, '');
-
   // Allow the UI server to also receive traces (some exporters hit one port).
-  if (req.method === 'POST' && path === '/v1/traces') return handleTraces(req, res);
+  if (path === '/v1/traces') {
+    if (req.method === 'OPTIONS') return send(res, 204, '', 'text/plain', CORS);
+    if (req.method === 'POST') return handleTraces(req, res);
+  }
+  if (req.method === 'OPTIONS') return send(res, 204, ''); // no CORS grant
 
   if (req.method === 'GET' && path === '/api/traces') return send(res, 200, store.list());
   // Full-text search over prompts, completions, tool payloads, models, names.
@@ -106,6 +119,7 @@ function handleUi(req, res) {
     return d ? send(res, 200, d) : send(res, 404, { error: 'not found' });
   }
   if (req.method === 'POST' && path === '/api/clear') {
+    if (!fromUi(req)) return send(res, 403, { error: `missing ${UI_HEADER}: 1 header` });
     store.clear();
     return send(res, 200, { ok: true });
   }
@@ -114,7 +128,6 @@ function handleUi(req, res) {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
     });
     res.write('retry: 2000\n\n');
     store.subscribe(res);
@@ -125,25 +138,30 @@ function handleUi(req, res) {
   return send(res, 405, { error: 'method not allowed' });
 }
 
-export function startServer({ port = 4318, uiPort = 4321, open = true, persist = null } = {}) {
+// Loopback by default: the UI holds your prompts, so it must not be reachable
+// from the LAN unless you ask (`--host 0.0.0.0`, e.g. inside a container).
+export function startServer({ port = 4318, uiPort = 4321, host = '127.0.0.1', open = true, persist = null } = {}) {
   if (persist) store.enablePersist(persist);
   // Ingest server: bare OTLP endpoint on the conventional 4318.
   const ingest = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
-    if (req.method === 'OPTIONS') return send(res, 204, '');
-    if (req.method === 'POST' && url.pathname === '/v1/traces') return handleTraces(req, res);
-    return send(res, 404, { error: 'POST OTLP traces to /v1/traces' });
+    if (url.pathname !== '/v1/traces') return send(res, 404, { error: 'POST OTLP traces to /v1/traces' });
+    if (req.method === 'OPTIONS') return send(res, 204, '', 'text/plain', CORS);
+    if (req.method === 'POST') return handleTraces(req, res);
+    return send(res, 405, { error: 'POST OTLP traces to /v1/traces' }, 'application/json', CORS);
   });
 
   const ui = http.createServer(handleUi);
 
-  ingest.listen(port, () => {
-    ui.listen(uiPort, () => {
-      const uiUrl = `http://localhost:${uiPort}`;
+  const shown = host === '0.0.0.0' || host === '::' ? 'localhost' : host;
+  ingest.listen(port, host, () => {
+    ui.listen(uiPort, host, () => {
+      const uiUrl = `http://${shown}:${uiPort}`;
       console.log(`\n  tracelet — local DevTools for AI agents\n`);
-      console.log(`  ▸ OTLP ingest   http://localhost:${port}/v1/traces`);
+      console.log(`  ▸ OTLP ingest   http://${shown}:${port}/v1/traces`);
       console.log(`  ▸ Web UI        ${uiUrl}\n`);
       console.log(`  Point your agent's OTel exporter at the ingest URL above.`);
+      if (host === '0.0.0.0' || host === '::') console.log(`  ▸ Exposed on all interfaces (--host ${host}) — anyone on the network can read traces.`);
       if (persist) {
         const n = store.loadedBatches || 0;
         console.log(`  ▸ History       ${persist}${n ? ` (restored ${n} batch${n === 1 ? '' : 'es'})` : ''}`);
