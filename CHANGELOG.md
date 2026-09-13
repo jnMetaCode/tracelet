@@ -46,6 +46,12 @@ All notable changes to this project are documented here. The format follows
   for the AI SDK, LangChain.js and plain OTLP — with the ingest URL the server
   actually listens on (`GET /api/config`). (The previous quick start ran
   `node examples/demo.js`, which only exists in a git clone — not for `npx`.)
+- README "Why another one?" rewritten against verified facts: it now lists
+  the local tools people actually compare tracelet with (AI SDK DevTools,
+  Mastra Studio, otel-front), says plainly when those are enough, and states
+  the real difference — step-aligned comparison of runs that understands LLM
+  spans, across frameworks. (The old table implied tracelet was the only
+  local, no-account `npx` option; AI SDK DevTools is one too.)
 - The startup banner groups every `▸` line (ingest, UI, demo, history,
   exposure warning) before the instructions. The hero GIF was re-recorded
   around the quick start exactly as typed (`npx @jnmetacode/tracelet --demo`).

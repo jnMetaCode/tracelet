@@ -19,13 +19,16 @@ renders — there is no tracelet SDK to adopt.
 
 ## Neighboring open-source observability tools
 
-These are real, good projects. Where tracelet differs is the **local, zero-setup,
-JS-native, live dev-loop** niche — see the table in the README.
+These are real, good projects. Where tracelet differs is **step-aligned comparison of two runs that
+understands LLM spans, across frameworks** — see the table in the README.
 
 | Project | Shape | License | Best when |
 | --- | --- | --- | --- |
+| [AI SDK DevTools](https://ai-sdk.dev/docs/ai-sdk-core/devtools) | Local viewer, `npx @ai-sdk/devtools` | Apache-2.0 | You use only the Vercel AI SDK and want a zero-setup local view of generations. |
+| [Mastra Studio](https://mastra.ai/docs/studio/overview) | Local dev UI bundled with `mastra dev` | `@mastra/core`: Apache-2.0 (repo mixes licenses) | You build on Mastra; includes traces and experiment comparison over datasets. |
+| [otel-front](https://github.com/mesaglio/otel-front) | Local generic OTel viewer (Go binary / Homebrew / Docker) | MIT | You want traces + logs + metrics locally, incl. side-by-side trace comparison, without LLM semantics. |
 | [Arize Phoenix](https://github.com/Arize-ai/phoenix) | Local-capable, Python, eval + trace UI | Elastic-2.0 | You're in Python and want evals + tracing in a notebook. |
-| [Langfuse](https://github.com/langfuse/langfuse) | Self-host (Postgres+ClickHouse+Redis) or cloud | MIT (core) | Team production analytics, prompt management, evals. |
+| [Langfuse](https://github.com/langfuse/langfuse) | Self-host (Postgres + ClickHouse + Redis + S3) or cloud | MIT (core) | Team production analytics, prompt management, evals. |
 | [Laminar (lmnr)](https://github.com/lmnr-ai/lmnr) | Self-host (Rust + PG + ClickHouse) or cloud | Apache-2.0 | "Datadog for agents" production analytics. |
 | [Helicone](https://github.com/Helicone/helicone) | Proxy-based logging/caching | Apache-2.0 | One-line base-URL swap, gateway-level logging. |
 | [OpenLLMetry](https://github.com/traceloop/openllmetry) | Instrumentation library (no bundled UI) | Apache-2.0 | You want to *emit* OTel and bring your own backend (like tracelet!). |

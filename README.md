@@ -108,24 +108,29 @@ No SDK lock-in: tracelet is just an OTLP endpoint + a viewer.
 
 ## Why another one?
 
-There are great LLM observability tools. None of them own the **inner debug
-loop** for a JS/TS agent developer:
+Local agent debuggers exist now — including good first-party ones. What
+tracelet adds is **comparing two runs of an agent step by step, whatever
+framework produced them.**
 
-| | local & offline | no account | no Docker stack | no Python | live dev-tail | `npx` one-liner |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: |
-| **tracelet** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Arize Phoenix | ✅ | ✅ | ✅ | ❌ (pip) | ~ | ❌ |
-| Langfuse (self-host) | ✅ | ✅ | ❌ (PG+ClickHouse+Redis) | ~ | ❌ | ❌ |
-| Laminar (self-host) | ✅ | ✅ | ❌ (PG+ClickHouse+RMQ) | ~ | ~ | ❌ |
-| LangSmith | ❌ | ❌ | — | — | ✅ | ❌ |
-| Helicone | ~ (proxy) | ❌ | ❌ | ~ | ~ | ❌ |
+| | local, no account | works across frameworks | reads LLM spans (prompts · tokens · cost) | compare two runs | start |
+| --- | :-: | :-: | :-: | :-: | --- |
+| **tracelet** | ✅ | ✅ any OTLP + one-liners for AI SDK / LangChain.js | ✅ | ✅ steps aligned, prompt diffs, Δ latency/tokens/cost | `npx` |
+| [AI SDK DevTools](https://ai-sdk.dev/docs/ai-sdk-core/devtools) | ✅ | ❌ AI SDK only | ✅ | — not in its docs | `npx @ai-sdk/devtools` |
+| [Mastra Studio](https://mastra.ai/docs/evals/experiments) | ✅ | ❌ Mastra only | ✅ | ~ compares *experiment* scores over a dataset | `mastra dev` |
+| [otel-front](https://github.com/mesaglio/otel-front) | ✅ | ✅ any OTLP | ❌ generic OpenTelemetry | ✅ side-by-side traces | Homebrew / Docker / binary |
 
-tracelet isn't trying to be your production analytics warehouse. It's the thing
-you keep open in a second window while you're *building* the agent — like the
-Network tab, but for agent runs.
+If you only use the AI SDK and don't need to compare runs, its DevTools is a
+fine choice. If your agent mixes frameworks, runs in Python too, or you keep
+asking *"what changed since the last run?"*, that's the gap tracelet fills.
 
-> Outgrew local? tracelet emits/relays standard OTLP, so graduate to any of the
-> tools above for production without re-instrumenting.
+It isn't a production analytics platform either. Those — [Langfuse](https://langfuse.com/self-hosting)
+(self-host: Postgres + ClickHouse + Redis + S3, or cloud), Arize Phoenix
+(`pip install arize-phoenix` or Docker), LangSmith (cloud) — bring retention,
+evals, dashboards and teams. tracelet is the window you keep open while
+*building*, like the Network tab for agent runs.
+
+> Outgrew local? Everything is standard OTLP, so you graduate to any of those
+> for production without re-instrumenting.
 
 ## How it works
 

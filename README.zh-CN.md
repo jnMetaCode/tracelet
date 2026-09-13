@@ -99,23 +99,26 @@ tracelet 同时理解三套常见的追踪语义约定，无论 trace 是谁发�
 
 ## 为什么还需要一个新工具？
 
-LLM 可观测性工具已经不少，但没有一个真正服务于 JS/TS agent 开发者的
-**内层调试循环**：
+本地的 agent 调试工具现在已经有了，其中也有做得不错的官方工具。tracelet
+补上的是：**无论运行来自哪个框架，都能把同一个 agent 的两次运行按步骤对比。**
 
-| | 本地离线 | 免账号 | 免 Docker | 免 Python | 实时开发流 | `npx` 一条命令 |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: |
-| **tracelet** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Arize Phoenix | ✅ | ✅ | ✅ | ❌ (pip) | ~ | ❌ |
-| Langfuse（自托管） | ✅ | ✅ | ❌ (PG+ClickHouse+Redis) | ~ | ❌ | ❌ |
-| Laminar（自托管） | ✅ | ✅ | ❌ (PG+ClickHouse+RMQ) | ~ | ~ | ❌ |
-| LangSmith | ❌ | ❌ | — | — | ✅ | ❌ |
-| Helicone | ~（代理） | ❌ | ❌ | ~ | ~ | ❌ |
+| | 本地、免账号 | 跨框架 | 理解 LLM span（prompt · token · 成本） | 对比两次运行 | 启动方式 |
+| --- | :-: | :-: | :-: | :-: | --- |
+| **tracelet** | ✅ | ✅ 任何 OTLP，AI SDK / LangChain.js 各有一行接入 | ✅ | ✅ 步骤对齐、prompt diff、Δ 延迟/token/成本 | `npx` |
+| [AI SDK DevTools](https://ai-sdk.dev/docs/ai-sdk-core/devtools) | ✅ | ❌ 仅 AI SDK | ✅ | — 文档中未提及 | `npx @ai-sdk/devtools` |
+| [Mastra Studio](https://mastra.ai/docs/evals/experiments) | ✅ | ❌ 仅 Mastra | ✅ | ~ 对比的是数据集上*实验*的评分 | `mastra dev` |
+| [otel-front](https://github.com/mesaglio/otel-front) | ✅ | ✅ 任何 OTLP | ❌ 通用 OpenTelemetry | ✅ trace 并排对比 | Homebrew / Docker / 二进制 |
 
-tracelet 不打算做你的生产分析仓库。它是你*构建* agent 时开在第二个窗口里的
-那个工具——就像浏览器的 Network 面板，只不过看的是 agent 的运行。
+如果你只用 AI SDK、也不需要对比运行，它的官方 DevTools 就够用。如果你的 agent
+混用多个框架、有一部分跑在 Python 里，或者你总在问*"这次和上次比到底哪里变了？"*，
+这正是 tracelet 要解决的问题。
 
-> 本地不够用了？tracelet 收发的是标准 OTLP，上生产时换成上面任何一家都不用
-> 重新埋点。
+它也不是生产环境的分析平台。[Langfuse](https://langfuse.com/self-hosting)（自托管需要
+Postgres + ClickHouse + Redis + S3，或用云服务）、Arize Phoenix（`pip install arize-phoenix`
+或 Docker）、LangSmith（云服务）提供的是数据留存、评测、看板和团队协作。tracelet
+是你*构建* agent 时开在旁边的那个窗口——就像浏览器的 Network 面板，看的是 agent 的运行。
+
+> 本地不够用了？一切都是标准 OTLP，上生产时换成上面任何一家都不用重新埋点。
 
 ## 工作原理
 

@@ -1,7 +1,7 @@
 {
   "name": "@jnmetacode/tracelet",
   "version": "0.3.0",
-  "description": "Local-first DevTools for AI agents. See every tool call, prompt, and token — 100% on your machine. Zero cloud, zero signup, one command.",
+  "description": "Local DevTools for AI agents: watch every LLM and tool call live, and diff two runs step by step. Any framework via OpenTelemetry, one-liners for the Vercel AI SDK and LangChain.js. Zero dependencies, 100% local.",
   "type": "module",
   "bin": {
     "tracelet": "src/cli.js"
