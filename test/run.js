@@ -988,3 +988,64 @@ test('store: spans beyond MAX_SPANS_PER_TRACE are counted as dropped, not stored
   assert.equal(store.summary(tid).dropped, 250);
   store.clear();
 });
+
+// ------------------------------------------------------------ first run ---
+test('first run: busy ingest port → friendly message, no throw; detects an already-running tracelet', async (t) => {
+  const first = startServer({ port: 4448, uiPort: 4449, open: false });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => { first.ingest.close(); first.ui.close(); });
+  const errors = [];
+  const orig = console.error; console.error = (m) => errors.push(String(m));
+  try {
+    startServer({ port: 4448, uiPort: 4449, open: false }); // same ports again
+    await new Promise((r) => setTimeout(r, 1200));
+  } finally { console.error = orig; }
+  const msg = errors.join('\n');
+  assert.match(msg, /already running/);
+  assert.match(msg, /localhost:4449/);
+  assert.doesNotMatch(msg, /Unhandled|at Server/);
+
+  // a non-tracelet squatter gets port advice instead
+  const squatter = http.createServer((q, r) => r.end('nope')).listen(4458, '127.0.0.1');
+  await new Promise((r) => setTimeout(r, 100));
+  t.after(() => squatter.close());
+  const errs2 = [];
+  console.error = (m) => errs2.push(String(m));
+  try {
+    startServer({ port: 4458, uiPort: 4459, open: false });
+    await new Promise((r) => setTimeout(r, 1200));
+  } finally { console.error = orig; }
+  assert.match(errs2.join('\n'), /Port 4458 \(OTLP ingest\) is already in use/);
+  assert.match(errs2.join('\n'), /--port 4459 --ui-port 4460/);
+});
+
+test('first run: /api/demo (UI-gated) and --demo load the before/after pair', async (t) => {
+  const { ingest, ui } = startServer({ port: 4468, uiPort: 4469, open: false });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => { ingest.close(); ui.close(); });
+  await req(4469, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
+  assert.equal((await req(4469, 'POST', '/api/demo', '')).status, 403);
+  assert.equal((await req(4469, 'POST', '/api/demo', '', { 'x-tracelet-ui': '1' })).status, 200);
+  const list = JSON.parse((await req(4469, 'GET', '/api/traces')).body);
+  assert.equal(list.length, 2);
+  assert.deepEqual(list.map((x) => x.errorCount).sort(), [0, 1]);
+  const d = JSON.parse((await req(4469, 'GET', `/api/diff?a=${list[1].traceId}&b=${list[0].traceId}`)).body);
+  assert.ok(d.counts.changed >= 3, 'the pair is built to show changes');
+  await req(4469, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
+
+  store.clear();
+  const s2 = startServer({ port: 4478, uiPort: 4479, open: false, demo: true });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => { s2.ingest.close(); s2.ui.close(); });
+  assert.equal(JSON.parse((await req(4479, 'GET', '/api/traces')).body).length, 2);
+  await req(4479, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
+});
+
+test('HTTP: /api/config reports the real ingest port for the empty-state wiring hint', async (t) => {
+  const { ingest, ui } = startServer({ port: 4488, uiPort: 4489, open: false });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => { ingest.close(); ui.close(); });
+  const c = JSON.parse((await req(4489, 'GET', '/api/config')).body);
+  assert.equal(c.ingestPort, 4488);
+  assert.equal(c.host, '127.0.0.1');
+});

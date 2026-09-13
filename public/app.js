@@ -679,6 +679,7 @@ function connect() {
 
 // ---- controls ------------------------------------------------------------
 $('#clear').onclick = () => api('/api/clear', { method: 'POST', headers: { 'x-tracelet-ui': '1' } });
+$('#load-demo').onclick = () => api('/api/demo', { method: 'POST', headers: { 'x-tracelet-ui': '1' } });
 $('#filter').oninput = (e) => { state.filter = e.target.value; renderList(); runSearch(); };
 $('#errors-only').onchange = (e) => { state.errorsOnly = e.target.checked; renderList(); };
 $('#compare').onclick = () => {
@@ -732,6 +733,9 @@ document.addEventListener('keydown', (e) => {
 // Deep links: #trace=<id> or #compare=<a>,<b> (handy for a second tab).
 async function boot() {
   state.baseline = loadBaseline();
+  api('/api/config').then((c) => {
+    if (c?.ingestPort) $('#ingest-url').textContent = `http://localhost:${c.ingestPort}/v1/traces`;
+  });
   // Read the deep link first: refreshList() auto-selects a trace, and
   // selectTrace() rewrites the hash.
   const h = new URLSearchParams(location.hash.slice(1));

@@ -7,6 +7,12 @@ calls, tool calls, prompts, tokens, latency, errors — in a clean local UI.
 ## See it in 30 seconds (no real agent needed)
 
 ```bash
+npx @jnmetacode/tracelet --demo   # two sample runs preloaded — press Compare
+```
+
+Or, from a clone, send them over real OTLP/HTTP:
+
+```bash
 # terminal 1 — start tracelet (UI opens at http://localhost:4321)
 npx @jnmetacode/tracelet
 

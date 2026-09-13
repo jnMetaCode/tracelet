@@ -37,13 +37,6 @@
         </div>
         <div id="pick-hint" class="pick-hint" hidden>Pick the run to compare against · <kbd>Esc</kbd> cancels</div>
         <ul id="trace-list" class="trace-list"></ul>
-        <div id="empty" class="empty">
-          <p>Waiting for traces…</p>
-          <code>http://localhost:4318/v1/traces</code>
-          <p class="muted small">
-            Point any OpenTelemetry exporter here. Nothing leaves this machine.
-          </p>
-        </div>
       </aside>
 
       <section class="pane waterfall">
@@ -52,6 +45,21 @@
           <button id="pin" class="btn small" title="Pin this run as the baseline: every new run is compared against it automatically (p)" hidden>Pin as baseline</button>
         </div>
         <div id="tree" class="tree"></div>
+        <div id="empty" class="empty">
+          <p>Waiting for traces…</p>
+          <button id="load-demo" class="btn primary">Load demo runs</button>
+          <p class="muted small">two runs of a sample agent — then press Compare</p>
+          <div class="wire">
+            <div class="h">Wire up your agent</div>
+            <div class="k">Vercel AI SDK v7</div>
+            <code>import '@jnmetacode/tracelet/ai-sdk/register'</code>
+            <div class="k">LangChain.js</div>
+            <code>{ callbacks: [tracelet()] }</code>
+            <div class="k">Any OpenTelemetry exporter</div>
+            <code id="ingest-url">http://localhost:4318/v1/traces</code>
+          </div>
+          <p class="muted small">Nothing leaves this machine.</p>
+        </div>
       </section>
 
       <aside class="pane detail">

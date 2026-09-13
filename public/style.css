@@ -86,6 +86,8 @@ body {
 .trace-item.has-error .t-name::after { content: " ⚠"; color: var(--error); }
 
 .empty { padding: 24px 16px; color: var(--muted); text-align: center; }
+.waterfall .empty { margin: auto; max-width: 440px; padding: 40px 24px; overflow-y: auto; }
+.waterfall .empty > p:first-child { font-size: 15px; color: var(--text); margin-top: 0; }
 .empty code { display: inline-block; background: var(--bg-elev2); padding: 4px 8px; border-radius: 6px; font-family: var(--mono); color: var(--accent); margin: 8px 0; }
 .muted { color: var(--muted); }
 .small { font-size: 11px; }
@@ -271,3 +273,10 @@ body {
   .pane.detail { grid-row: 3; grid-column: 1; }
   .brand .tag { display: none; }
 }
+
+/* Empty state: a way in without leaving the page */
+.empty .btn.primary { margin: 6px 0 2px; padding: 5px 12px; font-size: 12px; }
+.empty .wire { text-align: left; margin: 18px 0 10px; padding-top: 12px; border-top: 1px solid var(--border); }
+.empty .wire .h { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+.empty .wire .k { font-size: 11px; margin-top: 8px; }
+.empty .wire code { display: block; margin: 3px 0 0; font-size: 11px; white-space: normal; word-break: break-all; }

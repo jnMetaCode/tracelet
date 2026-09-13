@@ -7,6 +7,7 @@ import { store } from './store.js';
 import { parseOtlp } from './otlp.js';
 import { decodeTraces } from './otlp-protobuf.js';
 import { diffTraces } from './diff.js';
+import { demoPair } from './demo.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(__dirname, '..', 'public');
@@ -71,6 +72,8 @@ function send(res, code, body, type = 'application/json', extraHeaders = {}) {
 // header forces a CORS preflight, which fails (no CORS on /api), so a hostile
 // page can't e.g. POST /api/clear as a "simple request".
 const UI_HEADER = 'x-tracelet-ui';
+// What the UI needs to show accurate wiring instructions (set by startServer).
+const CONFIG = { ingestPort: 4318, host: '127.0.0.1' };
 const fromUi = (req) => req.headers[UI_HEADER] === '1';
 
 // ---- OTLP ingest handler (shared by ingest + UI servers) -----------------
@@ -128,6 +131,7 @@ function handleUi(req, res) {
   }
   if (req.method === 'OPTIONS') return send(res, 204, ''); // no CORS grant
 
+  if (req.method === 'GET' && path === '/api/config') return send(res, 200, CONFIG);
   if (req.method === 'GET' && path === '/api/traces') return send(res, 200, store.list());
   // Full-text search over prompts, completions, tool payloads, models, names.
   if (req.method === 'GET' && path === '/api/search') return send(res, 200, store.search((url.searchParams.get('q') || '').slice(0, 500)));
@@ -142,6 +146,12 @@ function handleUi(req, res) {
     const id = decodeURIComponent(path.slice('/api/traces/'.length));
     const d = store.detail(id);
     return d ? send(res, 200, d) : send(res, 404, { error: 'not found' });
+  }
+  // First-run demo: two synthetic runs of one agent, no clone or script needed.
+  if (req.method === 'POST' && path === '/api/demo') {
+    if (!fromUi(req)) return send(res, 403, { error: `missing ${UI_HEADER}: 1 header` });
+    for (const run of demoPair()) store.addSpans(parseOtlp(run));
+    return send(res, 200, { ok: true });
   }
   if (req.method === 'POST' && path === '/api/clear') {
     if (!fromUi(req)) return send(res, 403, { error: `missing ${UI_HEADER}: 1 header` });
@@ -165,8 +175,31 @@ function handleUi(req, res) {
 
 // Loopback by default: the UI holds your prompts, so it must not be reachable
 // from the LAN unless you ask (`--host 0.0.0.0`, e.g. inside a container).
-export function startServer({ port = 4318, uiPort = 4321, host = '127.0.0.1', open = true, persist = null } = {}) {
+// Is something at this UI port already a tracelet? (The most common reason the
+// ingest port is busy: you already started one in another terminal.)
+async function isTracelet(host, uiPort) {
+  try {
+    const h = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+    const r = await fetch(`http://${h}:${uiPort}/api/traces`, { signal: AbortSignal.timeout(800) });
+    return r.ok && Array.isArray(await r.json());
+  } catch {
+    return false;
+  }
+}
+
+export function startServer({
+  port = 4318,
+  uiPort = 4321,
+  host = '127.0.0.1',
+  open = true,
+  persist = null,
+  demo = false,
+  exitOnListenError = false,
+} = {}) {
   if (persist) store.enablePersist(persist);
+  if (demo) for (const run of demoPair()) store.addSpans(parseOtlp(run));
+  CONFIG.ingestPort = port;
+  CONFIG.host = host;
   // Ingest server: bare OTLP endpoint on the conventional 4318.
   const ingest = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -178,6 +211,34 @@ export function startServer({ port = 4318, uiPort = 4321, host = '127.0.0.1', op
 
   const ui = http.createServer(handleUi);
 
+  // A busy port must read as advice, not as a Node stack trace.
+  const onListenError = (which, busyPort) => async (err) => {
+    ingest.close();
+    ui.close();
+    const lines = [];
+    if (err.code === 'EADDRINUSE') {
+      if (await isTracelet(host, uiPort)) {
+        lines.push(`tracelet is already running → http://localhost:${uiPort}`);
+        lines.push(`(ingest on :${port}). Use that one, or stop it first.`);
+      } else {
+        lines.push(`Port ${busyPort} (${which}) is already in use by another program.`);
+        if (which === 'OTLP ingest') lines.push(`An OpenTelemetry Collector or Jaeger often holds 4318.`);
+        lines.push(`Pick free ports:  npx @jnmetacode/tracelet --port ${port + 1} --ui-port ${uiPort + 1}`);
+        if (which === 'OTLP ingest') lines.push(`…and point your exporter at http://localhost:${port + 1}/v1/traces`);
+      }
+    } else if (err.code === 'EACCES') {
+      lines.push(`Not allowed to listen on port ${busyPort} (${which}). Ports below 1024 need extra privileges — use a higher one.`);
+    } else if (err.code === 'EADDRNOTAVAIL') {
+      lines.push(`Cannot bind to --host ${host}: that address isn't on this machine.`);
+    } else {
+      lines.push(`Could not start the ${which} server on ${host}:${busyPort}: ${err.message}`);
+    }
+    console.error('\n  ' + lines.join('\n  ') + '\n');
+    if (exitOnListenError) process.exit(1);
+  };
+  ingest.on('error', onListenError('OTLP ingest', port));
+  ui.on('error', onListenError('web UI', uiPort));
+
   const shown = host === '0.0.0.0' || host === '::' ? 'localhost' : host;
   ingest.listen(port, host, () => {
     ui.listen(uiPort, host, () => {
@@ -187,6 +248,7 @@ export function startServer({ port = 4318, uiPort = 4321, host = '127.0.0.1', op
       console.log(`  ▸ Web UI        ${uiUrl}\n`);
       console.log(`  Point your agent's OTel exporter at the ingest URL above.`);
       if (host === '0.0.0.0' || host === '::') console.log(`  ▸ Exposed on all interfaces (--host ${host}) — anyone on the network can read traces.`);
+      if (demo) console.log(`  ▸ Demo          two sample runs loaded — open the UI and press Compare`);
       if (persist) {
         const n = store.loadedBatches || 0;
         console.log(`  ▸ History       ${persist}${n ? ` (restored ${n} batch${n === 1 ? '' : 'es'})` : ''}`);

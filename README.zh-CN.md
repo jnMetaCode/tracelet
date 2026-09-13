@@ -31,15 +31,12 @@ npx @jnmetacode/tracelet
 ## 快速开始
 
 ```bash
-# 1. 启动 tracelet（自动打开 http://localhost:4321）
-npx @jnmetacode/tracelet
-
-# 2. 用一条合成的 agent trace 看看效果
-npx @jnmetacode/tracelet & sleep 1 && node examples/demo.js
-
-# 3. 发送同一个 agent 的两次运行，然后对比（Compare 按钮）
-node examples/demo.js --compare
+# 启动时预载同一个 agent 的两次示例运行，然后按 Compare
+npx @jnmetacode/tracelet --demo
 ```
+
+或者直接启动（`npx @jnmetacode/tracelet`），在空白页上点 **Load demo runs**。
+如果 clone 了仓库，`node examples/demo.js --compare` 会通过真实的 OTLP/HTTP 发送同样的运行。
 
 用的是 **Vercel AI SDK（v7+）** 或 **LangChain.js**？一行，不用装任何 OpenTelemetry 包：
 
@@ -80,7 +77,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
 瀑布图上按住拖选一段时间范围即可放大（30 秒的运行里 40 毫秒的工具调用也能看清）；`Esc` 或双击复位。
 
-`node examples/demo.js --compare` 会发送一对"修复前 / 修复后"的运行，不用接真实 agent 就能试。
+`npx @jnmetacode/tracelet --demo` 会预载一对"修复前 / 修复后"的运行，不用接真实 agent 就能试。
 用 `#compare=<a>,<b>` 可以直接深链到一次对比。
 
 ## 与你现有的技术栈即插即用
@@ -146,6 +143,7 @@ npx @jnmetacode/tracelet [选项]
   -p, --port <n>      OTLP/HTTP 摄取端口   （默认 4318）
       --ui-port <n>   Web UI 端口          （默认 4321）
       --persist <f>   可选本地历史（JSONL，启动时自动恢复）
+      --demo          启动时预载两次示例 agent 运行
       --host <addr>   绑定地址（默认 127.0.0.1，仅本机；容器内或要暴露给局域网时用 0.0.0.0）
       --no-open       不自动打开浏览器
 ```

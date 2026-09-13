@@ -33,15 +33,13 @@ Nothing ever leaves your machine.
 ## Quick start
 
 ```bash
-# 1. Start tracelet (opens http://localhost:4321)
-npx @jnmetacode/tracelet
-
-# 2. See it work with a synthetic agent trace
-npx @jnmetacode/tracelet & sleep 1 && node examples/demo.js
-
-# 3. Send two runs of the same agent and diff them (Compare button)
-node examples/demo.js --compare
+# Start with two sample runs of an agent already loaded, then press Compare
+npx @jnmetacode/tracelet --demo
 ```
+
+Or start it plain (`npx @jnmetacode/tracelet`) and click **Load demo runs** on
+the empty screen. From a clone, `node examples/demo.js --compare` sends the same
+runs over real OTLP/HTTP.
 
 Using the **Vercel AI SDK (v7+)** or **LangChain.js**? One line, no OpenTelemetry packages:
 
@@ -87,7 +85,7 @@ waterfall.
 In the waterfall, drag across the bars to zoom into a time range (a 40 ms tool
 call inside a 30 s run becomes readable); `Esc` or double-click resets.
 
-`node examples/demo.js --compare` sends a before/after pair so you can try it
+`npx @jnmetacode/tracelet --demo` loads a before/after pair so you can try it
 without wiring an agent. Deep-link a comparison with `#compare=<a>,<b>`.
 
 ## Works with what you already use
@@ -161,6 +159,7 @@ npx @jnmetacode/tracelet [options]
   -p, --port <n>      OTLP/HTTP ingest port   (default 4318)
       --ui-port <n>   Web UI port             (default 4321)
       --persist <f>   opt-in local history (JSONL; reloaded on start)
+      --demo          start with two sample agent runs loaded
       --host <addr>   bind address (default 127.0.0.1 — loopback only;
                       0.0.0.0 to expose, e.g. inside a container)
       --no-open       don't auto-open browser

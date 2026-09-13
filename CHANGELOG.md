@@ -41,6 +41,15 @@ All notable changes to this project are documented here. The format follows
   the full text of prompts, completions and tool payloads (`GET /api/search?q=`);
   matching spans are highlighted in the waterfall. `/` focuses the box.
   Summaries carry `models` and `tools`.
+- **First run without a clone**: `--demo` starts with two sample runs loaded,
+  and the empty screen has a *Load demo runs* button plus the one-line wiring
+  for the AI SDK, LangChain.js and plain OTLP — with the ingest URL the server
+  actually listens on (`GET /api/config`). (The previous quick start ran
+  `node examples/demo.js`, which only exists in a git clone — not for `npx`.)
+- A busy port now prints advice instead of a Node stack trace: it detects an
+  already-running tracelet ("use that one"), or suggests free `--port` /
+  `--ui-port` values (4318 is often held by an OTel Collector or Jaeger).
+  Also clear messages for `EACCES` and a `--host` that isn't on this machine.
 - Keyboard navigation: `j` / `k` (or arrows) step through spans — or diff
   rows in Compare — and `[` / `]` step through runs.
 - **Waterfall zoom** — drag a range across the bars to zoom the time axis;

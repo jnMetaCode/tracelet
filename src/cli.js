@@ -10,6 +10,7 @@ function parseArgs(argv) {
     else if (a === '--persist') args.persist = argv[++i];
     else if (a === '--host') args.host = argv[++i];
     else if (a === '--no-open') args.open = false;
+    else if (a === '--demo') args.demo = true;
     else if (a === '--help' || a === '-h') args.help = true;
     else if (a === '--version' || a === '-v') args.version = true;
   }
@@ -29,6 +30,7 @@ Options:
                       reload it on start (default: in-memory only)
       --host <addr>   Bind address (default: 127.0.0.1 — loopback only).
                       Use 0.0.0.0 inside a container / to expose on the LAN.
+      --demo          Start with two sample agent runs loaded (try Compare)
       --no-open       Do not auto-open the browser
   -h, --help          Show this help
   -v, --version       Show version
@@ -70,4 +72,4 @@ if (args.port === args.uiPort) {
   process.exit(1);
 }
 
-startServer(args);
+startServer({ ...args, exitOnListenError: true });
