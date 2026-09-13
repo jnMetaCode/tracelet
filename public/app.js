@@ -109,6 +109,7 @@ function renderList() {
     if (t.costUsd != null) meta.appendChild(el('span', null, fmtCost(t.costUsd)));
     const n = state.hits[t.traceId]?.length;
     if (n) meta.appendChild(el('span', 'hit-tag', `${n} match${n === 1 ? '' : 'es'}`));
+    if (t.dropped) meta.appendChild(el('span', 'is-err', `+${fmtNum(t.dropped)} spans dropped`));
     li.appendChild(meta);
     li.onclick = () => {
       if (state.picking) {
@@ -168,7 +169,7 @@ function renderTree() {
     el(
       'span',
       null,
-      `${d.spanCount} spans · ${fmtMs(d.durationMs)} · ${fmtNum(d.tokens)} tok` +
+      `${d.spanCount} spans${d.dropped ? ` (+${fmtNum(d.dropped)} dropped)` : ''} · ${fmtMs(d.durationMs)} · ${fmtNum(d.tokens)} tok` +
         (d.costUsd != null ? ` · ${fmtCost(d.costUsd)}` : '')
     )
   );

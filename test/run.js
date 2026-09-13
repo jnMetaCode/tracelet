@@ -7,7 +7,8 @@ import { gzipSync } from 'node:zlib';
 import { parseOtlp } from '../src/otlp.js';
 import { decodeTraces } from '../src/otlp-protobuf.js';
 import { store } from '../src/store.js';
-import { startServer } from '../src/server.js';
+import { startServer, MAX_INFLATED_BYTES } from '../src/server.js';
+import { MAX_SPANS_PER_TRACE } from '../src/store.js';
 import { diffTraces, stepKey } from '../src/diff.js';
 import { tracelet as aiSdkTracelet } from '../src/ai-sdk.js';
 import { tracelet as lcTracelet } from '../src/langchain.js';
@@ -945,4 +946,45 @@ test('--persist: the history file is compacted during the run, not only at start
   store.enablePersist(file);
   assert.equal(store.list().length, 500);
   store.persistFile = null; store.clear();
+});
+
+// ------------------------------------------------------------- limits ---
+test('HTTP: a gzip bomb gets a 413, not an OOM; oversized bodies get a 413 too', async (t) => {
+  const PORT = 4438, UI = 4439;
+  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
+  await new Promise((r) => setTimeout(r, 150));
+  t.after(() => { ingest.close(); ui.close(); });
+  const bomb = gzipSync(Buffer.alloc(MAX_INFLATED_BYTES + 1024 * 1024, 0x30)); // 65 MB of '0'
+  assert.ok(bomb.length < 200 * 1024, `bomb should be tiny on the wire, is ${bomb.length}`);
+  const before = process.memoryUsage().rss;
+  const r = await req(PORT, 'POST', '/v1/traces', bomb, { 'content-type': 'application/json', 'content-encoding': 'gzip' });
+  assert.equal(r.status, 413);
+  assert.ok(process.memoryUsage().rss - before < 200 * 1024 * 1024, 'inflation must stop at the cap');
+  const declared = await new Promise((resolve) => {
+    const rq = http.request({ host: '127.0.0.1', port: PORT, path: '/v1/traces', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': String(60 * 1024 * 1024) } }, (res) => resolve(res.statusCode));
+    rq.on('error', () => resolve('error'));
+    rq.write('{'); // never send the rest
+  });
+  assert.equal(declared, 413);
+  // the server is still fine afterwards
+  const ok = await req(PORT, 'POST', '/v1/traces', envelope([baseSpan({ traceId: 'a'.repeat(32) })]), { 'content-type': 'application/json' });
+  assert.equal(ok.status, 200);
+  await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
+});
+
+test('store: spans beyond MAX_SPANS_PER_TRACE are counted as dropped, not stored', () => {
+  store.clear();
+  const tid = 'ba'.repeat(16);
+  const mk = (i) => baseSpan({ traceId: tid, spanId: String(i).padStart(16, '0'), parentSpanId: i ? '0'.repeat(16) : '' });
+  const N = MAX_SPANS_PER_TRACE + 250;
+  for (let i = 0; i < N; i += 500) {
+    store.addSpans(parseOtlp(envelope(Array.from({ length: Math.min(500, N - i) }, (_, k) => mk(i + k)))));
+  }
+  const sum = store.summary(tid);
+  assert.equal(sum.spanCount, MAX_SPANS_PER_TRACE);
+  assert.equal(sum.dropped, 250);
+  // re-sending an already-stored span (a late update) is not a drop
+  store.addSpans(parseOtlp(envelope([mk(5)])));
+  assert.equal(store.summary(tid).dropped, 250);
+  store.clear();
 });

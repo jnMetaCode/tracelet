@@ -7,6 +7,10 @@ import fs from 'node:fs';
 import { estimateCost, estimateTraceCost } from './cost.js';
 
 const MAX_TRACES = 500; // ring buffer; oldest traces are evicted
+// A runaway agent can emit spans forever under one trace id. Beyond this many
+// per trace, further spans are counted (`dropped`) but not stored, so memory
+// and the waterfall stay bounded.
+export const MAX_SPANS_PER_TRACE = 10_000;
 
 // Spans whose token counts should be summed for a trace. Many instrumentations
 // report usage on a wrapper span AND on the model call beneath it (the AI SDK's
@@ -111,10 +115,16 @@ class Store {
           start: Infinity,
           end: -Infinity,
           name: span.name,
+          dropped: 0,
         };
         this.traces.set(span.traceId, trace);
         this.order.push(span.traceId);
         this._evict();
+      }
+      if (trace.spans.size >= MAX_SPANS_PER_TRACE && !trace.spans.has(span.spanId)) {
+        trace.dropped++;
+        touched.add(span.traceId);
+        continue;
       }
       trace.spans.set(span.spanId, span);
       // Only fold in finite timestamps — a span with no times must not pin the
@@ -149,6 +159,7 @@ class Store {
       end: bounded ? t.end : 0,
       durationMs: bounded ? t.end - t.start : 0,
       spanCount: spans.length,
+      dropped: t.dropped || 0,
       errorCount: spans.filter((s) => s.status === 'ERROR').length,
       llmCalls: spans.filter((s) => s.kind === 'llm').length,
       toolCalls: spans.filter((s) => s.kind === 'tool').length,

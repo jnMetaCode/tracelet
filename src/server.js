@@ -19,15 +19,30 @@ const MIME = {
   '.json': 'application/json',
 };
 
-function readBody(req, limitBytes = 50 * 1024 * 1024) {
+// Bounds on what one request may make us hold in memory. OTLP batches are
+// normally kilobytes; these are generous for a local dev tool and small enough
+// that a bad batch can't take the process down.
+export const MAX_BODY_BYTES = 50 * 1024 * 1024;
+export const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
+
+class TooLarge extends Error {
+  constructor(what) {
+    super(`${what} exceeds the limit`);
+    this.status = 413;
+  }
+}
+
+function readBody(req, limitBytes = MAX_BODY_BYTES) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    const declared = Number(req.headers['content-length']);
+    if (declared > limitBytes) return reject(new TooLarge(`body (${declared} bytes)`));
     req.on('data', (c) => {
       size += c.length;
       if (size > limitBytes) {
-        reject(new Error('payload too large'));
-        req.destroy();
+        reject(new TooLarge('body'));
+        req.pause(); // stop reading; the 413 goes out before the socket closes
         return;
       }
       chunks.push(c);
@@ -65,8 +80,15 @@ async function handleTraces(req, res) {
     const ct = req.headers['content-type'] || '';
     // OTel exporters / the Collector commonly gzip the body — decompress first.
     const enc = (req.headers['content-encoding'] || '').toLowerCase();
-    if (enc.includes('gzip')) buf = gunzipSync(buf);
-    else if (enc.includes('deflate')) buf = inflateSync(buf);
+    // A 4 MB gzip of zeros inflates to 4 GB — cap the inflated size or a
+    // single hostile/buggy batch OOMs the process.
+    try {
+      if (enc.includes('gzip')) buf = gunzipSync(buf, { maxOutputLength: MAX_INFLATED_BYTES });
+      else if (enc.includes('deflate')) buf = inflateSync(buf, { maxOutputLength: MAX_INFLATED_BYTES });
+    } catch (e) {
+      if (e.code === 'ERR_BUFFER_TOO_LARGE') throw new TooLarge('inflated body');
+      throw e;
+    }
     // Accept both OTLP/HTTP encodings: protobuf (the exporter default) and JSON.
     const json = ct.includes('protobuf') ? decodeTraces(buf) : JSON.parse(buf.toString('utf8') || '{}');
     const spans = parseOtlp(json);
@@ -74,7 +96,10 @@ async function handleTraces(req, res) {
     // OTLP expects an ExportTraceServiceResponse (empty object = success).
     return send(res, 200, {}, 'application/json', CORS);
   } catch (err) {
-    return send(res, 400, { error: String(err && err.message) }, 'application/json', CORS);
+    const status = err && err.status === 413 ? 413 : 400;
+    send(res, status, { error: String(err && err.message) }, 'application/json', { ...CORS, Connection: 'close' });
+    if (status === 413) req.destroy(); // don't keep draining an oversized upload
+    return undefined;
   }
 }
 
@@ -105,7 +130,7 @@ function handleUi(req, res) {
 
   if (req.method === 'GET' && path === '/api/traces') return send(res, 200, store.list());
   // Full-text search over prompts, completions, tool payloads, models, names.
-  if (req.method === 'GET' && path === '/api/search') return send(res, 200, store.search(url.searchParams.get('q')));
+  if (req.method === 'GET' && path === '/api/search') return send(res, 200, store.search((url.searchParams.get('q') || '').slice(0, 500)));
   // Compare two runs step by step: /api/diff?a=<traceId>&b=<traceId>
   if (req.method === 'GET' && path === '/api/diff') {
     const a = store.detail(url.searchParams.get('a') || '');

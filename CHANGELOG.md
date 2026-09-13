@@ -54,6 +54,12 @@ All notable changes to this project are documented here. The format follows
   which cross-origin pages fail). OTLP ingest keeps `Access-Control-Allow-Origin: *`
   for browser-side exporters.
 
+- Ingest limits: request bodies over 50 MB and gzip/deflate payloads that
+  inflate past 64 MB get a `413` (a 4 MB gzip of zeros previously inflated to
+  gigabytes in memory). A trace stores at most 10 000 spans; further spans are
+  counted as `dropped` (shown in the run list and header) instead of growing
+  without bound. Search queries are capped at 500 characters.
+
 ### Fixed
 - `--persist` history is compacted during the run (every 1000 appended
   batches), not only at startup, so a long session can't grow the file past

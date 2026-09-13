@@ -145,6 +145,9 @@ your agent ──OTLP/HTTP (pb|json)──▶  :4318  ──▶  in-memory store
 - **Cost estimates.** Traces and LLM spans show a `~$` figure computed from
   published list prices for common models (Claude/GPT/Gemini); unknown models
   simply show none — it never guesses.
+- **Bounded.** 50 MB per request, 64 MB inflated, 10 000 spans per trace
+  (extras are counted as dropped, not stored), 500 traces in memory. A
+  runaway agent can't take the tool down with it.
 - **Private by default.** Both ports bind to `127.0.0.1` (use `--host 0.0.0.0`
   to expose them deliberately). The UI API sends no CORS headers, so a web page
   open in the same browser cannot read your traces; only the OTLP ingest path
