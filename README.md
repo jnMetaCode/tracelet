@@ -4,11 +4,11 @@
 
 ### Local-first DevTools for AI agents
 
-**See every tool call, prompt, and token — live, 100% on your machine.**
-No account. No Docker. No Python. Just `npx @jnmetacode/tracelet`.
+**Diff two runs of your agent step by step — and watch every LLM and tool call live.**
+Any framework. No account, no Docker, zero dependencies. 100% on your machine.
 
 ```bash
-npx @jnmetacode/tracelet
+npx @jnmetacode/tracelet --demo
 ```
 
 English | [简体中文](https://github.com/jnMetaCode/tracelet/blob/main/README.zh-CN.md)
@@ -27,6 +27,10 @@ in your terminal is the final answer (or a stack trace).
 exporter at `localhost:4318`, and watch your agent's execution tree stream in
 live: every LLM call, every tool invocation, prompts in, completions out, token
 counts, latency, and errors — in a clean local UI that opens instantly.
+
+And when you change a prompt, swap a model or fix a tool, **Compare** lines two
+runs up step by step and shows exactly what changed — which step, which model,
+the prompt diff, and the Δ in latency, tokens and cost.
 
 Nothing ever leaves your machine.
 

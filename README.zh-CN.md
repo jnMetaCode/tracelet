@@ -4,16 +4,16 @@
 
 ### AI agent 的本地优先 DevTools
 
-**实时看到每次工具调用、每条提示词、每个 token——100% 在你的机器上。**
-不注册、不用 Docker、不用 Python。一条 `npx @jnmetacode/tracelet` 就够了。
+**把 agent 的两次运行按步骤对比——同时实时看到每一次 LLM 和工具调用。**
+不限框架。不注册、不用 Docker、零依赖。100% 在你的机器上。
 
 ```bash
-npx @jnmetacode/tracelet
+npx @jnmetacode/tracelet --demo
 ```
 
 [English](./README.md) | 简体中文
 
-![tracelet 演示 — agent trace 实时流入；查看 LLM 调用（提示词、token）和报错的工具调用](docs/demo.gif)
+![tracelet 演示——同一个 agent 的两次运行；Compare 按步骤对齐并标出变化：修好的工具、换掉的模型、prompt diff、Δ 延迟/token/成本](docs/demo.gif)
 
 </div>
 
@@ -25,6 +25,9 @@ npx @jnmetacode/tracelet
 **tracelet** 就是这个循环里缺失的检查器。把任何 OpenTelemetry exporter 指向
 `localhost:4318`，agent 的执行树就实时流进一个秒开的本地 UI：每次 LLM 调用、
 每次工具调用、输入的提示词、输出的补全、token 数、延迟和报错。
+
+改了提示词、换了模型、修了工具之后，**Compare** 会把两次运行按步骤对齐，准确告诉你
+变了什么——哪一步、哪个模型、prompt 的 diff，以及延迟、token、成本的变化。
 
 任何数据都不会离开你的机器。
 

@@ -46,6 +46,9 @@ All notable changes to this project are documented here. The format follows
   for the AI SDK, LangChain.js and plain OTLP — with the ingest URL the server
   actually listens on (`GET /api/config`). (The previous quick start ran
   `node examples/demo.js`, which only exists in a git clone — not for `npx`.)
+- README first screen (en/zh) leads with comparing runs and shows
+  `npx @jnmetacode/tracelet --demo`; the Chinese README's GIF caption, which an
+  earlier bulk update silently missed, now describes the current GIF.
 - README "Why another one?" rewritten against verified facts: it now lists
   the local tools people actually compare tracelet with (AI SDK DevTools,
   Mastra Studio, otel-front), says plainly when those are enough, and states
