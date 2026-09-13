@@ -688,8 +688,40 @@ $('#compare').onclick = () => {
 };
 $('#pin').onclick = togglePin;
 installZoomDrag();
+// j / k: next / previous span (or diff row in Compare); [ / ]: previous / next run.
+function stepSpan(delta) {
+  if (state.compare) {
+    const rows = state.compare.data.rows;
+    if (!rows.length) return;
+    const cur = state.compare.row ?? -1;
+    selectDiffRow(Math.min(rows.length - 1, Math.max(0, cur + delta)));
+    return;
+  }
+  if (!state.detail) return;
+  const ordered = buildTree(state.detail.spans).map(({ span }) => span);
+  if (!ordered.length) return;
+  const cur = ordered.findIndex((sp) => sp.spanId === state.selectedSpan);
+  const next = ordered[Math.min(ordered.length - 1, Math.max(0, cur + delta))];
+  state.selectedSpan = next.spanId;
+  renderTree();
+  renderDetail(next);
+  $('#tree .row.active')?.scrollIntoView({ block: 'nearest' });
+}
+function stepRun(delta) {
+  const shown = visibleTraces();
+  if (!shown.length || state.picking) return;
+  const cur = shown.findIndex((t) => t.traceId === state.selected);
+  const next = shown[Math.min(shown.length - 1, Math.max(0, cur + delta))];
+  if (next && next.traceId !== state.selected) selectTrace(next.traceId);
+  $('#trace-list .trace-item.active')?.scrollIntoView({ block: 'nearest' });
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input')) return;
+  if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); return stepSpan(1); }
+  if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); return stepSpan(-1); }
+  if (e.key === ']') return stepRun(1);
+  if (e.key === '[') return stepRun(-1);
   if (e.key === 'p' && !state.compare) togglePin();
   if (e.key === '/') { e.preventDefault(); $('#filter').focus(); }
   if (e.key === 'Escape' && state.picking) { state.picking = false; renderList(); }

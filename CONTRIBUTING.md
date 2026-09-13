@@ -59,6 +59,24 @@ HTTP layer like the existing tests do. Integration changes are tested by
 driving the callbacks with synthetic events and parsing the OTLP they emit —
 no framework package in the test suite.
 
+## Performance envelope (measured, 2026-09, M-series Mac, Chromium)
+
+So you know what "fast enough" currently means before optimising:
+
+| Scenario | Measured |
+| --- | --- |
+| Run list with 500 traces, first paint | ~95 ms |
+| 40 span batches arriving in one burst on that list | 1 list fetch, no main-thread task > 50 ms |
+| Waterfall for a 10 000-span trace (the per-trace cap) | ~0.6 s to 10 000 rows |
+| `/api/diff` for two 10 000-span traces | ~150 ms (greedy alignment path) |
+| Compare view with 10 000 rows | ~1.3 s, longest task ~350 ms |
+| Search over 20 000 spans | instant (per-span text is cached) |
+| gzip that inflates past 64 MB | `413` in ~25 ms, RSS +80 MB |
+
+Typical agent runs are 5–200 spans, so none of the 10k numbers are on the
+hot path; virtualising the waterfall would be the first thing to do if they
+ever are. Please add a row here when you change something that moves them.
+
 ## Re-recording the hero GIF
 
 `docs/demo.gif` is generated, not hand-made. When the UI changes visibly:

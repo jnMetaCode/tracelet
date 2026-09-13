@@ -170,6 +170,8 @@ npx @jnmetacode/tracelet [options]
 | Key | |
 | --- | --- |
 | `/` | focus search |
+| `j` / `k` (or ↓ / ↑) | next / previous span — or diff row in Compare |
+| `[` / `]` | previous / next run |
 | `c` | compare the selected run with another |
 | `p` | pin / unpin the selected run as baseline |
 | `Esc` | cancel picking · reset zoom |

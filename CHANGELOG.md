@@ -41,6 +41,8 @@ All notable changes to this project are documented here. The format follows
   the full text of prompts, completions and tool payloads (`GET /api/search?q=`);
   matching spans are highlighted in the waterfall. `/` focuses the box.
   Summaries carry `models` and `tools`.
+- Keyboard navigation: `j` / `k` (or arrows) step through spans — or diff
+  rows in Compare — and `[` / `]` step through runs.
 - **Waterfall zoom** — drag a range across the bars to zoom the time axis;
   spans outside the window dim; `Esc`, double-click or the header chip resets.
 
