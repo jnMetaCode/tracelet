@@ -80,7 +80,9 @@ ever are. Please add a row here when you change something that moves them.
 ## Re-recording the hero GIF
 
 `docs/demo.gif` is generated, not hand-made. When the UI changes visibly:
-`vhs docs/demo-term.tape` (needs `vhs` + `ttyd`) for the terminal opener, then
-`node docs/record-ui.mjs <playwright-dir> <out>` against a running tracelet for
-the UI segment, then concatenate with ffmpeg (`fps=12`, palettegen). Keep it
-under 30 s and loop-friendly.
+`vhs docs/demo-term.tape` (needs `vhs` + `ttyd`) for the terminal opener — it
+types the README quick start verbatim — then start a fresh
+`node src/cli.js --no-open --demo` and run
+`node docs/record-ui.mjs <playwright-dir> <out>` for the UI segment, then
+concatenate with ffmpeg (`fps=12`, palettegen). Keep it under 30 s and
+loop-friendly, and keep the typed command identical to the README's.

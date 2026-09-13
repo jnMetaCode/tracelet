@@ -46,6 +46,9 @@ All notable changes to this project are documented here. The format follows
   for the AI SDK, LangChain.js and plain OTLP — with the ingest URL the server
   actually listens on (`GET /api/config`). (The previous quick start ran
   `node examples/demo.js`, which only exists in a git clone — not for `npx`.)
+- The startup banner groups every `▸` line (ingest, UI, demo, history,
+  exposure warning) before the instructions. The hero GIF was re-recorded
+  around the quick start exactly as typed (`npx @jnmetacode/tracelet --demo`).
 - A busy port now prints advice instead of a Node stack trace: it detects an
   already-running tracelet ("use that one"), or suggests free `--port` /
   `--ui-port` values (4318 is often held by an OTel Collector or Jaeger).

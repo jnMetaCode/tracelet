@@ -249,14 +249,14 @@ export function startServer({
       const uiUrl = `http://${shown}:${uiPort}`;
       console.log(`\n  tracelet — local DevTools for AI agents\n`);
       console.log(`  ▸ OTLP ingest   http://${shown}:${port}/v1/traces`);
-      console.log(`  ▸ Web UI        ${uiUrl}\n`);
-      console.log(`  Point your agent's OTel exporter at the ingest URL above.`);
-      if (host === '0.0.0.0' || host === '::') console.log(`  ▸ Exposed on all interfaces (--host ${host}) — anyone on the network can read traces.`);
+      console.log(`  ▸ Web UI        ${uiUrl}`);
       if (demo) console.log(`  ▸ Demo          two sample runs loaded — open the UI and press Compare`);
       if (persist) {
         const n = store.loadedBatches || 0;
         console.log(`  ▸ History       ${persist}${n ? ` (restored ${n} batch${n === 1 ? '' : 'es'})` : ''}`);
       }
+      if (host === '0.0.0.0' || host === '::') console.log(`  ▸ Exposed on all interfaces (--host ${host}) — anyone on the network can read traces.`);
+      console.log(`\n  Point your agent's OTel exporter at the ingest URL above.`);
       console.log(`  Nothing leaves this machine.\n`);
       markReady();
       if (open) openBrowser(uiUrl);
