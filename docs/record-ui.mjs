@@ -17,7 +17,7 @@ const { chromium } = await import(pwDir ? join(pwDir, 'index.mjs') : 'playwright
 const UI = 'http://127.0.0.1:4321';
 const DEMO = join(here, '..', 'examples', 'demo.js');
 
-await fetch(`${UI}/api/clear`, { method: 'POST' });
+await fetch(`${UI}/api/clear`, { method: 'POST', headers: { 'x-tracelet-ui': '1' } });
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
