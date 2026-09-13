@@ -252,8 +252,8 @@ function req(port, method, path, body, headers = {}) {
 test('HTTP: ingest → list → detail → clear, plus error paths', async (t) => {
   const PORT = 4378;
   const UI = 4381;
-  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: PORT, uiPort: UI, open: false });
+  await ready;
   t.after(() => {
     ingest.close();
     ui.close();
@@ -310,8 +310,8 @@ test('HTTP: ingest → list → detail → clear, plus error paths', async (t) =
 test('HTTP: gzip-compressed OTLP ingests', async (t) => {
   const PORT = 4377;
   const UI = 4380;
-  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: PORT, uiPort: UI, open: false });
+  await ready;
   t.after(() => {
     ingest.close();
     ui.close();
@@ -330,8 +330,8 @@ test('HTTP: gzip-compressed OTLP ingests', async (t) => {
 test('HTTP: SSE pushes a live event on ingest', async (t) => {
   const PORT = 4379;
   const UI = 4382;
-  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: PORT, uiPort: UI, open: false });
+  await ready;
   t.after(() => {
     ingest.close();
     ui.close();
@@ -584,8 +584,8 @@ test('diff: cost delta is unknown unless both runs could be priced', () => {
 test('HTTP: /api/diff compares two ingested runs; 404 when a side is unknown', async (t) => {
   const PORT = 4398;
   const UI = 4399;
-  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: PORT, uiPort: UI, open: false });
+  await ready;
   t.after(() => { ingest.close(); ui.close(); });
   await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
 
@@ -897,8 +897,8 @@ test('store: a wrapper keeps its usage when children only report 0 tokens', () =
 // ------------------------------------------------------------- security ---
 test('HTTP: binds loopback by default; /api has no CORS; clear needs the UI header; ingest keeps CORS', async (t) => {
   const PORT = 4418, UI = 4419;
-  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: PORT, uiPort: UI, open: false });
+  await ready;
   t.after(() => { ingest.close(); ui.close(); });
   assert.equal(ingest.address().address, '127.0.0.1');
   assert.equal(ui.address().address, '127.0.0.1');
@@ -920,8 +920,8 @@ test('HTTP: binds loopback by default; /api has no CORS; clear needs the UI head
 });
 
 test('HTTP: --host 0.0.0.0 opts into all interfaces', async (t) => {
-  const { ingest, ui } = startServer({ port: 4428, uiPort: 4429, host: '0.0.0.0', open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: 4428, uiPort: 4429, host: '0.0.0.0', open: false });
+  await ready;
   t.after(() => { ingest.close(); ui.close(); });
   assert.equal(ui.address().address, '0.0.0.0');
 });
@@ -951,8 +951,8 @@ test('--persist: the history file is compacted during the run, not only at start
 // ------------------------------------------------------------- limits ---
 test('HTTP: a gzip bomb gets a 413, not an OOM; oversized bodies get a 413 too', async (t) => {
   const PORT = 4438, UI = 4439;
-  const { ingest, ui } = startServer({ port: PORT, uiPort: UI, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: PORT, uiPort: UI, open: false });
+  await ready;
   t.after(() => { ingest.close(); ui.close(); });
   const bomb = gzipSync(Buffer.alloc(MAX_INFLATED_BYTES + 1024 * 1024, 0x30)); // 65 MB of '0'
   assert.ok(bomb.length < 200 * 1024, `bomb should be tiny on the wire, is ${bomb.length}`);
@@ -992,7 +992,7 @@ test('store: spans beyond MAX_SPANS_PER_TRACE are counted as dropped, not stored
 // ------------------------------------------------------------ first run ---
 test('first run: busy ingest port → friendly message, no throw; detects an already-running tracelet', async (t) => {
   const first = startServer({ port: 4448, uiPort: 4449, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  await first.ready;
   t.after(() => { first.ingest.close(); first.ui.close(); });
   const errors = [];
   const orig = console.error; console.error = (m) => errors.push(String(m));
@@ -1020,8 +1020,8 @@ test('first run: busy ingest port → friendly message, no throw; detects an alr
 });
 
 test('first run: /api/demo (UI-gated) and --demo load the before/after pair', async (t) => {
-  const { ingest, ui } = startServer({ port: 4468, uiPort: 4469, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: 4468, uiPort: 4469, open: false });
+  await ready;
   t.after(() => { ingest.close(); ui.close(); });
   await req(4469, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
   assert.equal((await req(4469, 'POST', '/api/demo', '')).status, 403);
@@ -1035,17 +1035,27 @@ test('first run: /api/demo (UI-gated) and --demo load the before/after pair', as
 
   store.clear();
   const s2 = startServer({ port: 4478, uiPort: 4479, open: false, demo: true });
-  await new Promise((r) => setTimeout(r, 150));
+  await s2.ready;
   t.after(() => { s2.ingest.close(); s2.ui.close(); });
   assert.equal(JSON.parse((await req(4479, 'GET', '/api/traces')).body).length, 2);
   await req(4479, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
 });
 
 test('HTTP: /api/config reports the real ingest port for the empty-state wiring hint', async (t) => {
-  const { ingest, ui } = startServer({ port: 4488, uiPort: 4489, open: false });
-  await new Promise((r) => setTimeout(r, 150));
+  const { ingest, ui, ready } = startServer({ port: 4488, uiPort: 4489, open: false });
+  await ready;
   t.after(() => { ingest.close(); ui.close(); });
   const c = JSON.parse((await req(4489, 'GET', '/api/config')).body);
   assert.equal(c.ingestPort, 4488);
   assert.equal(c.host, '127.0.0.1');
+});
+
+test('startServer: no process signal listeners (library-safe); `ready` resolves when listening', async (t) => {
+  const beforeInt = process.listenerCount('SIGINT'), beforeTerm = process.listenerCount('SIGTERM');
+  const srv = startServer({ port: 4498, uiPort: 4499, open: false });
+  t.after(() => { srv.ingest.close(); srv.ui.close(); });
+  await srv.ready;
+  assert.equal(process.listenerCount('SIGINT'), beforeInt);
+  assert.equal(process.listenerCount('SIGTERM'), beforeTerm);
+  assert.equal((await req(4499, 'GET', '/api/config')).status, 200);
 });

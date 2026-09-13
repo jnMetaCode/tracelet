@@ -50,6 +50,12 @@ All notable changes to this project are documented here. The format follows
   already-running tracelet ("use that one"), or suggests free `--port` /
   `--ui-port` values (4318 is often held by an OTel Collector or Jaeger).
   Also clear messages for `EACCES` and a `--host` that isn't on this machine.
+- `startServer()` (the package's main export) no longer installs SIGINT /
+  SIGTERM handlers — the CLI does. Embedding tracelet in another process no
+  longer hijacks Ctrl+C, and repeated calls no longer leak listeners. It now
+  returns a `ready` promise that resolves once both ports are listening.
+- CI covers Node 24; the publish workflow refuses a tag that doesn't match
+  `package.json`'s version.
 - Keyboard navigation: `j` / `k` (or arrows) step through spans — or diff
   rows in Compare — and `[` / `]` step through runs.
 - **Waterfall zoom** — drag a range across the bars to zoom the time axis;

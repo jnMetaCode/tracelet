@@ -239,6 +239,10 @@ export function startServer({
   ingest.on('error', onListenError('OTLP ingest', port));
   ui.on('error', onListenError('web UI', uiPort));
 
+  // Resolves once both ports are listening (never, if either fails to bind).
+  let markReady;
+  const ready = new Promise((resolve) => (markReady = resolve));
+
   const shown = host === '0.0.0.0' || host === '::' ? 'localhost' : host;
   ingest.listen(port, host, () => {
     ui.listen(uiPort, host, () => {
@@ -254,18 +258,15 @@ export function startServer({
         console.log(`  ▸ History       ${persist}${n ? ` (restored ${n} batch${n === 1 ? '' : 'es'})` : ''}`);
       }
       console.log(`  Nothing leaves this machine.\n`);
+      markReady();
       if (open) openBrowser(uiUrl);
     });
   });
 
-  const bye = () => {
-    ingest.close();
-    ui.close();
-    process.exit(0);
-  };
-  process.on('SIGINT', bye);
-  process.on('SIGTERM', bye);
-  return { ingest, ui };
+  // Signal handling (Ctrl+C → exit) belongs to the CLI, not here: startServer is
+  // the package's main export, and a library must not take over a host
+  // process's SIGINT or add listeners every time it's called.
+  return { ingest, ui, ready };
 }
 
 function openBrowser(url) {

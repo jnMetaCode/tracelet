@@ -72,4 +72,11 @@ if (args.port === args.uiPort) {
   process.exit(1);
 }
 
-startServer({ ...args, exitOnListenError: true });
+const { ingest, ui } = startServer({ ...args, exitOnListenError: true });
+const bye = () => {
+  ingest.close();
+  ui.close();
+  process.exit(0);
+};
+process.once('SIGINT', bye);
+process.once('SIGTERM', bye);
