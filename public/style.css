@@ -93,7 +93,7 @@ body {
 /* Waterfall / tree */
 .waterfall { overflow: hidden; }
 #trace-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: 1; min-width: 0; }
-.tree { overflow: auto; flex: 1; padding: 6px 0; }
+.tree { overflow: auto; flex: 1; padding: 6px 0; position: relative; }
 .row {
   display: grid;
   grid-template-columns: 1fr 120px;
@@ -237,3 +237,9 @@ body {
 .hit-tag { color: #fbbf24; }
 .row.hit { box-shadow: inset 3px 0 0 #fbbf24; }
 .row.hit .span-name { color: #fde68a; }
+
+/* Waterfall zoom */
+.bar-wrap { cursor: col-resize; }
+.zoom-sel { position: absolute; top: 0; bottom: 0; background: rgba(124,156,255,.14); border-left: 1px solid var(--accent); border-right: 1px solid var(--accent); pointer-events: none; }
+.zoom-chip { margin-left: 8px; font-family: var(--mono); }
+.row.off { opacity: .35; }

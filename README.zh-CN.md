@@ -78,6 +78,8 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
 运行列表本身可以搜索（`/`）：名称、模型、工具名，以及 prompt / completion / 工具载荷的全文——命中的 span 会在瀑布图里高亮。
 
+瀑布图上按住拖选一段时间范围即可放大（30 秒的运行里 40 毫秒的工具调用也能看清）；`Esc` 或双击复位。
+
 `node examples/demo.js --compare` 会发送一对"修复前 / 修复后"的运行，不用接真实 agent 就能试。
 用 `#compare=<a>,<b>` 可以直接深链到一次对比。
 
@@ -149,7 +151,7 @@ npx @jnmetacode/tracelet [选项]
 - [x] 两次运行的并排对比（Compare：步骤对齐、prompt/输出 diff、Δ 延迟/token/成本）——已完成
 - [x] 按模型估算成本（trace 和 LLM span 显示 `~$`）—— 已完成
 - [x] protobuf OTLP 摄取（零依赖解码器）—— 已完成
-- [ ] 瀑布图火焰缩放
+- [x] 瀑布图缩放（在时间条上拖选范围；Esc / 双击复位）——已完成
 - [x] Vercel AI SDK 一行接入（`@jnmetacode/tracelet/ai-sdk`，零依赖）——已完成
 - [x] Mastra：纯配置接入 `@mastra/otel-exporter`（`examples/mastra.md`）
 - [x] LangChain.js / LangGraph.js 一行接入（`@jnmetacode/tracelet/langchain`，零依赖）——已完成

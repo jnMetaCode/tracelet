@@ -41,6 +41,8 @@ All notable changes to this project are documented here. The format follows
   the full text of prompts, completions and tool payloads (`GET /api/search?q=`);
   matching spans are highlighted in the waterfall. `/` focuses the box.
   Summaries carry `models` and `tools`.
+- **Waterfall zoom** — drag a range across the bars to zoom the time axis;
+  spans outside the window dim; `Esc`, double-click or the header chip resets.
 
 ### Fixed
 - Trace token and cost totals no longer double-count when a wrapper span

@@ -84,6 +84,9 @@ The run list searches too (`/`): names, models, tool names, and the full text
 of prompts, completions and tool payloads — matching spans light up in the
 waterfall.
 
+In the waterfall, drag across the bars to zoom into a time range (a 40 ms tool
+call inside a 30 s run becomes readable); `Esc` or double-click resets.
+
 `node examples/demo.js --compare` sends a before/after pair so you can try it
 without wiring an agent. Deep-link a comparison with `#compare=<a>,<b>`.
 
@@ -159,7 +162,7 @@ npx @jnmetacode/tracelet [options]
 - [x] Diff two runs side by side (Compare: aligned steps, prompt/output diffs, Δ latency/tokens/cost) — done
 - [x] Cost estimates per model (list-price `~$` on traces and LLM spans) — done
 - [x] protobuf OTLP ingest (zero-dep decoder) — done
-- [ ] Waterfall flamegraph zoom
+- [x] Waterfall zoom (drag a time range on the bars; Esc / double-click resets) — done
 - [x] Trace list: search inside prompts/outputs, filter by model/tool — done
 - [x] One-line wrapper for the Vercel AI SDK (`@jnmetacode/tracelet/ai-sdk`, zero deps) — done
 - [x] Mastra: config-only wiring via `@mastra/otel-exporter` (`examples/mastra.md`)

@@ -19,6 +19,7 @@ const state = {
   baseline: null, // traceId every new run is auto-compared against
   known: new Set(), // traceIds already seen, to spot brand-new runs
   hits: {}, // server content search: traceId → [spanId] for the current filter
+  zoom: null, // waterfall time window { t0, t1 } (absolute ms), null = whole trace
 };
 
 const BASELINE_KEY = 'tracelet.baseline';
@@ -162,21 +163,30 @@ function renderTree() {
   title.innerHTML = '';
   renderPin();
   title.appendChild(el('span', null, d.name || d.traceId.slice(0, 16)));
-  title.appendChild(
+  const stats = el('span', 'muted small');
+  stats.appendChild(
     el(
       'span',
-      'muted small',
+      null,
       `${d.spanCount} spans · ${fmtMs(d.durationMs)} · ${fmtNum(d.tokens)} tok` +
         (d.costUsd != null ? ` · ${fmtCost(d.costUsd)}` : '')
     )
   );
+  if (state.zoom) {
+    const z = el('button', 'btn small zoom-chip', `🔍 ${fmtMs(state.zoom.t0 - d.start)} – ${fmtMs(state.zoom.t1 - d.start)} · reset`);
+    z.title = 'Zoomed — click, double-click the waterfall, or press Esc to reset';
+    z.onclick = () => setZoom(null);
+    stats.appendChild(z);
+  }
+  title.appendChild(stats);
 
-  const t0 = d.start;
-  const span = Math.max(1, d.end - d.start);
+  const t0 = state.zoom ? state.zoom.t0 : d.start;
+  const span = Math.max(1, (state.zoom ? state.zoom.t1 : d.end) - t0);
   for (const { span: s, depth } of buildTree(d.spans)) {
     const row = el('div', 'row' + (s.status === 'ERROR' ? ' err' : ''));
     if (s.spanId === state.selectedSpan) row.classList.add('active');
     if (state.hits[d.traceId]?.includes(s.spanId)) row.classList.add('hit');
+    if (state.zoom && Number.isFinite(s.start) && (s.end < state.zoom.t0 || s.start > state.zoom.t1)) row.classList.add('off');
 
     const label = el('div', 'label');
     label.style.paddingLeft = `${depth * 14}px`;
@@ -188,10 +198,14 @@ function renderTree() {
     const right = el('div');
     const wrap = el('div', 'bar-wrap');
     const bar = el('div', `bar ${s.kind}` + (s.status === 'ERROR' ? ' err' : ''));
-    const left = Number.isFinite(s.start) ? ((s.start - t0) / span) * 100 : 0;
-    bar.style.left = `${left}%`;
-    bar.style.width = `${Math.max(1, (s.durationMs / span) * 100)}%`;
-    bar.title = fmtMs(s.durationMs);
+    // Clamp to the window so a zoomed-in bar never spills out of its track.
+    const rawLeft = Number.isFinite(s.start) ? ((s.start - t0) / span) * 100 : 0;
+    const rawRight = rawLeft + (s.durationMs / span) * 100;
+    const lEdge = Math.min(100, Math.max(0, rawLeft));
+    const rEdge = Math.min(100, Math.max(0, rawRight));
+    bar.style.left = `${lEdge}%`;
+    bar.style.width = `${Math.max(rEdge - lEdge, rEdge > 0 && lEdge < 100 ? 0.5 : 0)}%`;
+    bar.title = fmtMs(s.durationMs) + (Number.isFinite(s.start) ? ` @ ${fmtMs(s.start - d.start)}` : '');
     wrap.appendChild(bar);
     right.appendChild(wrap);
     right.appendChild(el('div', 'dur', fmtMs(s.durationMs)));
@@ -204,6 +218,66 @@ function renderTree() {
     };
     tree.appendChild(row);
   }
+}
+
+// ---- waterfall zoom (drag a range on the bars; Esc / double-click resets) --
+function setZoom(z) {
+  state.zoom = z;
+  renderTree();
+}
+
+function installZoomDrag() {
+  const tree = $('#tree');
+  let drag = null; // { x0, rect, box, moved }
+  // The click that can follow a drag must not select a row. A drag that ends on
+  // a different row than it started on produces no click at all, so use a
+  // timestamp rather than a flag that would otherwise eat the next real click.
+  let dragEndedAt = 0;
+  const trackRect = () => tree.querySelector('.bar-wrap')?.getBoundingClientRect();
+  tree.addEventListener('pointerdown', (e) => {
+    if (state.compare || !state.detail || e.button !== 0) return;
+    const rect = trackRect();
+    if (!rect || e.clientX < rect.left || e.clientX > rect.right) return; // only over the bar column
+    drag = { x0: e.clientX, rect, box: null, moved: false };
+    tree.setPointerCapture?.(e.pointerId);
+  });
+  tree.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = Math.abs(e.clientX - drag.x0);
+    if (!drag.moved && dx < 6) return; // a plain click still selects the row
+    drag.moved = true;
+    if (!drag.box) {
+      drag.box = el('div', 'zoom-sel');
+      tree.appendChild(drag.box);
+    }
+    const treeRect = tree.getBoundingClientRect();
+    const a = Math.max(drag.rect.left, Math.min(drag.x0, e.clientX));
+    const b = Math.min(drag.rect.right, Math.max(drag.x0, e.clientX));
+    drag.box.style.left = `${a - treeRect.left}px`;
+    drag.box.style.width = `${Math.max(1, b - a)}px`;
+  });
+  const finish = (e) => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    d.box?.remove();
+    if (!d.moved) return;
+    const det = state.detail;
+    const t0 = state.zoom ? state.zoom.t0 : det.start;
+    const t1 = state.zoom ? state.zoom.t1 : det.end;
+    const toT = (x) => t0 + ((Math.max(d.rect.left, Math.min(d.rect.right, x)) - d.rect.left) / d.rect.width) * (t1 - t0);
+    const [za, zb] = [toT(d.x0), toT(e.clientX)].sort((p, q) => p - q);
+    if (zb - za >= 0.5) setZoom({ t0: za, t1: zb }); // ignore sub-ms slivers
+    dragEndedAt = Date.now();
+  };
+  tree.addEventListener('pointerup', finish);
+  tree.addEventListener('pointercancel', () => { drag?.box?.remove(); drag = null; });
+  tree.addEventListener('click', (e) => {
+    if (Date.now() - dragEndedAt > 300) return;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+  tree.addEventListener('dblclick', () => { if (state.zoom) setZoom(null); });
 }
 
 // ---- span detail ---------------------------------------------------------
@@ -525,6 +599,7 @@ async function selectTrace(id) {
   if (state.compare) state.compare = null;
   state.selected = id;
   state.selectedSpan = null;
+  state.zoom = null;
   location.hash = `trace=${id}`;
   renderList();
   const detail = await api(`/api/traces/${encodeURIComponent(id)}`);
@@ -597,11 +672,13 @@ $('#compare').onclick = () => {
   renderList();
 };
 $('#pin').onclick = togglePin;
+installZoomDrag();
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input')) return;
   if (e.key === 'p' && !state.compare) togglePin();
   if (e.key === '/') { e.preventDefault(); $('#filter').focus(); }
   if (e.key === 'Escape' && state.picking) { state.picking = false; renderList(); }
+  if (e.key === 'Escape' && state.zoom && !state.compare) setZoom(null);
   if (e.key === 'c' && !state.compare && state.selected) { state.picking = !state.picking; renderList(); }
 });
 
