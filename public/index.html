@@ -14,7 +14,7 @@
     <header class="topbar">
       <div class="brand">
         <span class="logo">🔭</span>
-        <span class="name">tracelet</span>
+        <h1 class="name">tracelet</h1>
         <span class="tag">local DevTools for AI agents</span>
       </div>
       <div class="status">
@@ -24,7 +24,7 @@
     </header>
 
     <main class="layout">
-      <aside class="pane traces">
+      <aside class="pane traces" aria-label="Runs">
         <div class="pane-head">
           <span>Traces <span id="trace-count" class="muted"></span></span>
           <button id="compare" class="btn small" title="Compare the selected run with another one (c)">
@@ -36,10 +36,10 @@
           <label title="Only runs with errored spans"><input id="errors-only" type="checkbox" /> ⚠ only</label>
         </div>
         <div id="pick-hint" class="pick-hint" hidden>Pick the run to compare against · <kbd>Esc</kbd> cancels</div>
-        <ul id="trace-list" class="trace-list"></ul>
+        <ul id="trace-list" class="trace-list" role="listbox" aria-label="Runs"></ul>
       </aside>
 
-      <section class="pane waterfall">
+      <section class="pane waterfall" aria-label="Waterfall">
         <div class="pane-head">
           <span id="trace-title">Select a trace</span>
           <button id="pin" class="btn small" title="Pin this run as the baseline: every new run is compared against it automatically (p)" hidden>Pin as baseline</button>
@@ -62,9 +62,9 @@
         </div>
       </section>
 
-      <aside class="pane detail">
+      <aside class="pane detail" aria-label="Span inspector">
         <div class="pane-head" id="detail-title">Span</div>
-        <div id="detail" class="detail">
+        <div id="detail" class="detail" tabindex="0">
           <p class="muted">Select a span to inspect its prompt, response, tokens and attributes.</p>
         </div>
       </aside>

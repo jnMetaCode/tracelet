@@ -56,6 +56,12 @@ All notable changes to this project are documented here. The format follows
   returns a `ready` promise that resolves once both ports are listening.
 - CI covers Node 24; the publish workflow refuses a tag that doesn't match
   `package.json`'s version.
+- Accessibility: runs, waterfall rows and compare rows are reachable with
+  Tab and activate with Enter / Space (keyboard focus stays on the row after
+  it re-renders); the run list is a labelled listbox; the three panes are
+  named landmarks; the inspector is focusable so long prompts scroll by
+  keyboard; visible `:focus-visible` rings. axe-core 4.13 reports no
+  violations on the empty, run and compare views (was 3 rules, one serious).
 - Keyboard navigation: `j` / `k` (or arrows) step through spans — or diff
   rows in Compare — and `[` / `]` step through runs.
 - **Waterfall zoom** — drag a range across the bars to zoom the time axis;

@@ -46,6 +46,20 @@ async function api(path, opts) {
   }
 }
 
+// ---- keyboard / screen-reader affordances ----------------------------------
+// Rows are rebuilt on every render, so activating one would drop keyboard focus
+// to <body>. Re-focus the new active element — only after a user action, never
+// from a background SSE refresh (that would steal focus from wherever it is).
+function keepFocus(selector) {
+  const target = document.querySelector(selector);
+  if (target && document.activeElement !== target) target.focus({ preventScroll: true });
+}
+function focusableRow(row, current) {
+  row.tabIndex = 0;
+  row.setAttribute('role', 'button');
+  if (current) row.setAttribute('aria-current', 'true');
+}
+
 // ---- trace list ----------------------------------------------------------
 // Name / model / tool matches are answered locally from the summaries; prompt
 // and completion content comes from /api/search (see runSearch), merged in.
@@ -93,6 +107,9 @@ function renderList() {
   for (const t of shown) {
     const li = el('li', 'trace-item' + (t.errorCount ? ' has-error' : ''));
     if (t.traceId === state.selected && !state.compare) li.classList.add('active');
+    li.setAttribute('role', 'option');
+    li.setAttribute('aria-selected', String(t.traceId === state.selected));
+    li.tabIndex = 0;
     if (state.picking && t.traceId === state.selected) li.classList.add('pick-a');
     const head = el('div', 't-head');
     if (state.compare?.a === t.traceId) head.appendChild(el('span', 'ab a', 'A'));
@@ -117,6 +134,7 @@ function renderList() {
         return;
       }
       selectTrace(t.traceId);
+      keepFocus('#trace-list .trace-item.active');
     };
     list.appendChild(li);
   }
@@ -186,6 +204,7 @@ function renderTree() {
   for (const { span: s, depth } of buildTree(d.spans)) {
     const row = el('div', 'row' + (s.status === 'ERROR' ? ' err' : ''));
     if (s.spanId === state.selectedSpan) row.classList.add('active');
+    focusableRow(row, s.spanId === state.selectedSpan);
     if (state.hits[d.traceId]?.includes(s.spanId)) row.classList.add('hit');
     if (state.zoom && Number.isFinite(s.start) && (s.end < state.zoom.t0 || s.start > state.zoom.t1)) row.classList.add('off');
 
@@ -216,6 +235,7 @@ function renderTree() {
       state.selectedSpan = s.spanId;
       renderTree();
       renderDetail(s);
+      keepFocus('#tree .row.active');
     };
     tree.appendChild(row);
   }
@@ -311,7 +331,7 @@ function renderDetail(s, banner) {
   d.innerHTML = '';
   $('#detail-title').textContent = 'Span';
   if (banner) d.appendChild(el('div', 'side-banner', banner));
-  d.appendChild(el('h3', null, s.io?.toolName || s.name));
+  d.appendChild(el('h2', null, s.io?.toolName || s.name));
   d.appendChild(el('div', 'sub', `${s.kind.toUpperCase()} · ${fmtMs(s.durationMs)} · ${s.service}`));
 
   if (s.status === 'ERROR') {
@@ -459,6 +479,7 @@ function renderDiff() {
   rows.forEach((r, i) => {
     const s = r.a || r.b;
     const row = el('div', `drow ${r.type}` + (i === active ? ' active' : ''));
+    focusableRow(row, i === active);
     const label = el('div', 'label');
     label.style.paddingLeft = `${s.depth * 14}px`;
     label.appendChild(el('span', 'mark', { same: '', changed: '~', added: '+', removed: '−' }[r.type]));
@@ -494,7 +515,10 @@ function renderDiff() {
       dcell.appendChild(deltaEl(fmtDeltaMs(dd), dd === 0 ? null : dd < 0));
     }
     row.appendChild(dcell);
-    row.onclick = () => selectDiffRow(i);
+    row.onclick = () => {
+      selectDiffRow(i);
+      keepFocus('#tree .drow.active');
+    };
     tree.appendChild(row);
   });
 }
@@ -511,7 +535,7 @@ function selectDiffRow(i) {
   const d = $('#detail');
   d.innerHTML = '';
   $('#detail-title').textContent = 'A → B';
-  d.appendChild(el('h3', null, spanB.io?.toolName || spanB.name));
+  d.appendChild(el('h2', null, spanB.io?.toolName || spanB.name));
   d.appendChild(el('div', 'sub', `${spanB.kind.toUpperCase()} · ${r.changes.length ? r.changes.join(', ') + ' changed' : 'same step, compare timings'}`));
   if (spanA.status === 'ERROR' || spanB.status === 'ERROR') {
     d.appendChild(el('div', 'err-banner', `A: ${spanA.status}${spanA.statusMessage ? ' — ' + spanA.statusMessage : ''}\nB: ${spanB.status}${spanB.statusMessage ? ' — ' + spanB.statusMessage : ''}`));
@@ -718,6 +742,12 @@ function stepRun(delta) {
 }
 
 document.addEventListener('keydown', (e) => {
+  const role = e.target.getAttribute?.('role');
+  if ((e.key === 'Enter' || e.key === ' ') && (role === 'option' || role === 'button') && e.target.tagName !== 'BUTTON') {
+    e.preventDefault();
+    e.target.click();
+    return;
+  }
   if (e.target.matches('input')) return;
   if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); return stepSpan(1); }
   if (e.key === 'k' || e.key === 'ArrowUp') { e.preventDefault(); return stepSpan(-1); }
