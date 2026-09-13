@@ -136,8 +136,9 @@ your agent ──OTLP/HTTP (pb|json)──▶  :4318  ──▶  in-memory store
                                           (ring buffer, never persisted off-box)
 ```
 
-- **Zero dependencies.** Pure Node built-ins. The whole thing is a few hundred
-  lines you can read.
+- **Zero dependencies.** Pure Node built-ins, no build step. About 3 000
+  lines all in — server, parser, UI and the framework integrations — readable
+  in an afternoon.
 - **Two ports.** `4318` ingests OTLP (the convention), `4321` serves the UI.
 - **In-memory ring buffer.** Last 500 traces. Restart = clean slate — unless
   you opt in to `--persist <file>`, which keeps history in a local JSONL file
@@ -196,8 +197,8 @@ right now.
 
 Usable daily: live ingest (protobuf + JSON), waterfall + inspector, Compare /
 baseline, search, zoom, cost estimates, opt-in history, and verified one-line
-integrations for the Vercel AI SDK, LangChain.js and Mastra. Still small (a
-few hundred lines you can read) and still opinionated about staying local.
+integrations for the Vercel AI SDK, LangChain.js and Mastra. Still small (~3 000
+lines, no build step, no dependencies) and still opinionated about staying local.
 Issues with a sample OTLP payload are the most useful contribution.
 
 ## Sibling projects

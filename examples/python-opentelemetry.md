@@ -49,10 +49,24 @@ provider.shutdown()  # flush before exit — don't lose the last batch
 Open `http://127.0.0.1:4321`: one `agent.run` trace with a tool span and an LLM
 span, model name and **token counts** parsed from the `gen_ai.*` attributes.
 
+Re-verified 2026-09 with `opentelemetry-sdk` 1.44 on Python 3.14 against
+tracelet 0.3.0 (3 spans, 1 052 tokens, cost estimate shown).
+
 Notes:
 
 - If the process is long-running you don't need `shutdown()`; the batch
   processor flushes on its own. For short scripts, always call it.
+- **Behind a system proxy?** The Python exporter (via `requests`) honors
+  `HTTP_PROXY` / `HTTPS_PROXY`, so with a proxy set it sends `127.0.0.1:4318`
+  *through the proxy* and you see `Transient error Bad Gateway … retrying`.
+  Exempt loopback:
+
+  ```bash
+  export NO_PROXY=127.0.0.1,localhost   # also no_proxy= for some tools
+  ```
+
+  (The Node integrations use `fetch`, which ignores those variables, so they
+  are unaffected.)
 - Frameworks that already speak OpenTelemetry (LangChain via
   `opentelemetry-instrumentation`, OpenAI Agents SDK tracing processors, …)
   only need the endpoint env var:
