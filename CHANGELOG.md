@@ -65,6 +65,11 @@ All notable changes to this project are documented here. The format follows
   batches), not only at startup, so a long session can't grow the file past
   what the 500-trace ring retains.
 - The UI coalesces bursts of span batches into one list refresh per ~80 ms.
+- Responsive layout: side panes shrink below 1180 px, the inspector moves
+  under the waterfall below 960 px, everything stacks below 640 px — the
+  waterfall stays readable in a half-screen window next to an editor.
+- Test suite verified on a real Node 18.20 binary (the `engines` floor), not
+  only on 22.
 - Trace token and cost totals no longer double-count when a wrapper span
   reports the same usage as the model call beneath it (AI SDK root + `chat`
   child, legacy `ai.generateText` + `.doGenerate`). Only the innermost
