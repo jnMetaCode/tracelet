@@ -155,6 +155,7 @@ export function tracelet(opts = {}) {
       finish(st.root, {
         attrs: {
           'ai.response.text': st.outputs ? e.text : undefined,
+          'ai.response.object': st.outputs && e.object !== undefined ? safeJson(e.object) : undefined,
           'ai.response.finishReason': e.finishReason,
           'gen_ai.usage.input_tokens': u.inputTokens,
           'gen_ai.usage.output_tokens': u.outputTokens,

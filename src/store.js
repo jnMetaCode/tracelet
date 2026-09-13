@@ -33,8 +33,9 @@ function searchText(span) {
 function tokenLeaves(spans) {
   const parentOf = new Map(spans.map((s) => [s.spanId, s.parentSpanId]));
   const hasTokenChild = new Set();
+  const bearing = (s) => Number(s.tokens?.total) > 0;
   for (const s of spans) {
-    if (!s.tokens) continue;
+    if (!bearing(s)) continue;
     // Walk up: every ancestor of a token-bearing span is not a leaf.
     let p = parentOf.get(s.spanId);
     let hops = 0;
@@ -43,7 +44,7 @@ function tokenLeaves(spans) {
       p = parentOf.get(p);
     }
   }
-  return spans.filter((s) => s.tokens && !hasTokenChild.has(s.spanId));
+  return spans.filter((s) => bearing(s) && !hasTokenChild.has(s.spanId));
 }
 
 class Store {

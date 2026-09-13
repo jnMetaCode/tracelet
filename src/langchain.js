@@ -80,11 +80,13 @@ export function tracelet({ recordInputs = true, recordOutputs = true, ...exporte
       // Same for generic Runnable plumbing (a RunnableLambda routing edge, an
       // unnamed RunnableSequence) — graph nodes carry their node name instead.
       const anonymousRunnable = /^Runnable/.test(runName || last(chain?.id) || '');
-      if (tags?.includes('langsmith:hidden') || (anonymousRunnable && parentRunId && runs.has(parentRunId))) {
-        const parent = parentRunId && runs.get(parentRunId);
-        if (parent) runs.set(runId, { ...parent, passthrough: true });
+      const parent = parentRunId && runs.get(parentRunId);
+      if (parent && (tags?.includes('langsmith:hidden') || anonymousRunnable)) {
+        runs.set(runId, { ...parent, passthrough: true });
         return;
       }
+      // (A hidden run at the top level still gets a span — otherwise its
+      // children would each start a trace of their own.)
       const isRoot = !parentRunId || !runs.has(parentRunId);
       start(runId, parentRunId, {
         name: nameOf(chain, runName),

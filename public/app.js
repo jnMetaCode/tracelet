@@ -37,8 +37,12 @@ const fmtDeltaNum = (d) => `${sign(d)}${fmtNum(Math.abs(d))}`;
 const fmtDeltaCost = (d) => (d == null ? '' : `${sign(d)}${fmtCost(Math.abs(d)).slice(1)}`);
 
 async function api(path, opts) {
-  const r = await fetch(path, opts);
-  return r.ok ? r.json() : null;
+  try {
+    const r = await fetch(path, opts);
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null; // network blip / server restarting — callers treat null as "nothing"
+  }
 }
 
 // ---- trace list ----------------------------------------------------------
@@ -283,7 +287,7 @@ async function startCompare(a, b) {
     api(`/api/traces/${encodeURIComponent(b)}`),
     api(`/api/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`),
   ]);
-  if (!data) return renderList();
+  if (!data || !detailA || !detailB) return selectTrace(a); // a side vanished (evicted / cleared)
   state.compare = { a, b, data, detailA, detailB, row: null };
   location.hash = `compare=${a},${b}`;
   renderList();
@@ -298,13 +302,13 @@ async function startCompare(a, b) {
 }
 
 function exitCompare() {
+  const id = state.compare?.a || state.selected;
   state.compare = null;
   state.picking = false;
-  location.hash = state.selected ? `trace=${state.selected}` : '';
+  if (id) return selectTrace(id); // reloads detail — state.detail may belong to another run
+  location.hash = '';
   renderList();
   renderTree();
-  $('#detail').innerHTML = '<p class="muted">Select a span to inspect it.</p>';
-  $('#detail-title').textContent = 'Span';
 }
 
 function deltaEl(text, good) {
@@ -523,13 +527,15 @@ async function selectTrace(id) {
   state.selectedSpan = null;
   location.hash = `trace=${id}`;
   renderList();
-  state.detail = await api(`/api/traces/${encodeURIComponent(id)}`);
+  const detail = await api(`/api/traces/${encodeURIComponent(id)}`);
+  if (state.selected !== id || state.compare) return; // superseded while loading
+  state.detail = detail;
   renderTree();
   $('#detail').innerHTML = '<p class="muted">Select a span to inspect it.</p>';
   $('#detail-title').textContent = 'Span';
 }
 
-async function refreshList() {
+async function refreshList({ autoSelect = true } = {}) {
   state.traces = (await api('/api/traces')) || [];
   for (const t of state.traces) state.known.add(t.traceId);
   if (state.baseline && !state.traces.some((t) => t.traceId === state.baseline)) {
@@ -537,7 +543,7 @@ async function refreshList() {
     saveBaseline(null);
   }
   renderList();
-  if (!state.selected && state.traces.length) selectTrace(state.traces[0].traceId);
+  if (autoSelect && !state.selected && state.traces.length) selectTrace(state.traces[0].traceId);
 }
 
 // ---- live updates --------------------------------------------------------
@@ -602,18 +608,24 @@ document.addEventListener('keydown', (e) => {
 // Deep links: #trace=<id> or #compare=<a>,<b> (handy for a second tab).
 async function boot() {
   state.baseline = loadBaseline();
-  await refreshList();
-  renderList();
+  // Read the deep link first: refreshList() auto-selects a trace, and
+  // selectTrace() rewrites the hash.
   const h = new URLSearchParams(location.hash.slice(1));
-  if (h.get('compare')) {
-    const [a, b] = h.get('compare').split(',');
-    if (a && b && state.traces.some((t) => t.traceId === a) && state.traces.some((t) => t.traceId === b)) {
+  const has = (id) => state.traces.some((t) => t.traceId === id);
+  try {
+    await refreshList({ autoSelect: !h.get('compare') && !h.get('trace') });
+    renderList();
+    const [a, b] = (h.get('compare') || '').split(',');
+    if (a && b && has(a) && has(b)) {
       state.selected = a;
       await startCompare(a, b);
+    } else if (h.get('trace') && has(h.get('trace'))) {
+      await selectTrace(h.get('trace'));
+    } else if (!state.selected && state.traces.length) {
+      await selectTrace(state.traces[0].traceId); // deep link pointed at a run that's gone
     }
-  } else if (h.get('trace') && state.traces.some((t) => t.traceId === h.get('trace'))) {
-    selectTrace(h.get('trace'));
+  } finally {
+    connect(); // whatever happened above, the live feed must open
   }
-  connect();
 }
 boot();

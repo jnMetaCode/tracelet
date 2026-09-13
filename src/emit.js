@@ -35,13 +35,17 @@ export function toAttributes(obj) {
 // Every exporter created in the process, so one exit hook can flush them all —
 // `{ callbacks: [tracelet()] }` written inline creates one per call and must
 // not add a process listener each time.
-const EXPORTERS = new Set();
+const EXPORTERS = new Set(); // of WeakRef — the registry must not keep exporters alive
 let exitHookInstalled = false;
 function installExitHook() {
   if (exitHookInstalled || !process.once) return;
   exitHookInstalled = true;
   process.once('beforeExit', () => {
-    for (const x of EXPORTERS) void x.flush();
+    for (const ref of EXPORTERS) {
+      const x = ref.deref();
+      if (x) void x.flush();
+      else EXPORTERS.delete(ref);
+    }
   });
 }
 
@@ -56,6 +60,8 @@ export const errorMessage = (e) =>
  * @param {number} [opts.flushMs]    batch window before POSTing
  * @param {Function} [opts.fetch]
  */
+const SHARED = new Map(); // "scope|url|service|flushMs" → exporter (default fetch only)
+
 export function createExporter({
   scope,
   url = process.env.TRACELET_URL || DEFAULT_URL,
@@ -63,6 +69,12 @@ export function createExporter({
   flushMs = 100,
   fetch: fetchImpl = globalThis.fetch,
 }) {
+  // Handlers are often written inline (`{ callbacks: [tracelet()] }`), once per
+  // call. Reuse one exporter per configuration so that neither the registry nor
+  // the number of in-flight batches grows with call count.
+  const key = fetchImpl === globalThis.fetch ? `${scope}|${url}|${serviceName}|${flushMs}` : null;
+  if (key && SHARED.has(key)) return SHARED.get(key);
+
   let pending = [];
   let timer = null;
   let warned = false;
@@ -120,7 +132,8 @@ export function createExporter({
     flush,
   };
   // Don't let a short script exit with the last batch still in the timer.
-  EXPORTERS.add(exporter);
+  EXPORTERS.add(new WeakRef(exporter));
+  if (key) SHARED.set(key, exporter);
   installExitHook();
   return exporter;
 }

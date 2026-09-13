@@ -846,3 +846,49 @@ test('search: repeated queries reuse cached span text (no per-call stringify of 
   assert.ok(ms < 500, `200 searches took ${ms.toFixed(0)}ms`);
   store.clear();
 });
+
+test('langchain handler: a hidden/anonymous run at the top level still roots one trace', async () => {
+  const f = fakeFetch();
+  const h = lcTracelet({ url: 'http://x', fetch: f, flushMs: 5 });
+  h.handleChainStart(SER('RunnableSequence'), {}, 'top', undefined, ['langsmith:hidden'], {}, undefined, undefined);
+  h.handleToolStart(SER('Tool'), '{}', 't1', 'top', [], {}, 'search', 'tc');
+  h.handleToolEnd('ok', 't1', 'top');
+  h.handleChainEnd({}, 'top', undefined);
+  await h.flush();
+  const spans = parseOtlp(f.calls[0].body);
+  assert.equal(spans.length, 2);
+  assert.equal(new Set(spans.map((s) => s.traceId)).size, 1, 'one trace, not one per child');
+  assert.equal(spans.find((s) => s.kind === 'tool').parentSpanId, spans.find((s) => s.kind === 'agent').spanId);
+});
+
+test('emit: inline handlers with the same config share one exporter (default fetch)', async () => {
+  const { createExporter } = await import('../src/emit.js');
+  const a = createExporter({ scope: 'langchain', url: 'http://127.0.0.1:1/x', serviceName: 'same' });
+  const b = createExporter({ scope: 'langchain', url: 'http://127.0.0.1:1/x', serviceName: 'same' });
+  const c = createExporter({ scope: 'langchain', url: 'http://127.0.0.1:1/x', serviceName: 'other' });
+  assert.equal(a, b);
+  assert.notEqual(a, c);
+});
+
+test('ai-sdk integration: generateObject runs record the object on the root span', async () => {
+  const f = fakeFetch();
+  const integ = aiSdkTracelet({ url: 'http://x', fetch: f, flushMs: 5 });
+  integ.onStart({ callId: 'o', operationId: 'ai.generateObject', provider: 'openai', modelId: 'gpt-4o', messages: [] });
+  integ.onEnd({ callId: 'o', object: { city: 'SF' }, finishReason: 'stop' });
+  await integ.flush();
+  const root = parseOtlp(f.calls[0].body)[0];
+  assert.equal(root.name, 'ai.generateObject');
+  assert.deepEqual(JSON.parse(root.io.output), { city: 'SF' });
+});
+
+test('store: a wrapper keeps its usage when children only report 0 tokens', () => {
+  store.clear();
+  const tid = 'fa'.repeat(16);
+  const usage = (n) => [{ key: 'gen_ai.usage.input_tokens', value: iv(n) }, { key: 'gen_ai.usage.output_tokens', value: iv(0) }, { key: 'gen_ai.request.model', value: s('gpt-4o') }];
+  store.addSpans(parseOtlp(envelope([
+    baseSpan({ traceId: tid, spanId: 'root', name: 'ai.streamText', attributes: usage(950) }),
+    baseSpan({ traceId: tid, spanId: 'c1', parentSpanId: 'root', name: 'chat gpt-4o', attributes: usage(0) }), // provider sent no usage
+  ])));
+  assert.equal(store.summary(tid).tokens, 950);
+  store.clear();
+});
