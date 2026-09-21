@@ -5,6 +5,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-21
+### Fixed
+- **A malformed request could stop tracelet.** A bad `%`-escape in a trace id
+  (`/api/traces/%E0`) or an unparsable request target threw inside the request
+  handler and took the whole process down — and any web page could send the
+  first one as an `<img>`. Every request is now guarded: a malformed one gets a
+  `400`, the server keeps running.
+- **Cost estimates for the current Claude models.** `claude-opus-5` was priced
+  through the generic Opus fallback at $15/$75 per MTok (3× list) and
+  `claude-sonnet-5` at $3/$15 (1.5×). Both are now listed ($5/$25, $2/$10), as
+  is Mythos 5. Fallbacks are pinned to the old versions they describe, so a
+  model we have no price for shows no estimate instead of an older rate; dotted
+  ids (`claude-opus-4.5`) price like their dashed form.
+- `--persist`: the history file (it holds every prompt) is created owner-only
+  (`0600`), and an existing one is tightened on start.
+
 ## [0.3.1] - 2026-09-21
 ### Security
 - **DNS rebinding.** A web page could re-point its own domain at `127.0.0.1`
@@ -169,7 +185,8 @@ First public release.
 - Verified walkthroughs for the Vercel AI SDK and the Python OpenTelemetry
   SDK (`examples/`).
 
-[Unreleased]: https://github.com/jnMetaCode/tracelet/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/jnMetaCode/tracelet/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/jnMetaCode/tracelet/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/jnMetaCode/tracelet/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jnMetaCode/tracelet/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jnMetaCode/tracelet/compare/v0.2.0...v0.2.1

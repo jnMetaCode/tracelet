@@ -1,17 +1,23 @@
 // Best-effort cost estimates per LLM span, from published list prices.
-// Prices are USD per 1M tokens (input, output), checked 2026-06. They change —
+// Prices are USD per 1M tokens (input, output), checked 2026-09. They change —
 // treat every figure as an estimate (the UI labels it "~"). Unknown models
 // simply get no estimate; we never guess.
 
 const USD_PER_MTOK = [
   // Anthropic (per platform.claude.com pricing)
-  ['claude-fable-5', 10, 50],
+  ['claude-fable-5', 10, 50], // also Fable 5.1
+  ['claude-mythos-5', 10, 50],
+  ['claude-opus-5', 5, 25],
   ['claude-opus-4-8', 5, 25],
   ['claude-opus-4-7', 5, 25],
   ['claude-opus-4-6', 5, 25],
   ['claude-opus-4-5', 5, 25],
-  ['claude-opus', 15, 75], // older opus (4.1 and earlier)
-  ['claude-sonnet', 3, 15],
+  // Version-pinned fallbacks only: a bare 'claude-opus' would price a future
+  // model at an old rate — that's a guess, and unknown models get no estimate.
+  ['claude-opus-4', 15, 75], // Opus 4 / 4.1 (4.5+ matched above)
+  ['claude-3-opus', 15, 75],
+  ['claude-sonnet-5', 2, 10],
+  ['claude-sonnet-4', 3, 15], // Sonnet 4 / 4.5 / 4.6
   ['claude-3-7-sonnet', 3, 15],
   ['claude-3-5-sonnet', 3, 15],
   ['claude-haiku-4-5', 1, 5],
@@ -42,6 +48,8 @@ function normalize(model) {
   m = m.replace(/^(anthropic|openai|google|models|publishers\/[a-z]+\/models)[./]/, '');
   // bedrock regional prefixes like "us.anthropic.claude-…"
   m = m.replace(/^[a-z][a-z-]{1,6}\.(anthropic|amazon)\./, '');
+  // Claude ids use dashes ("claude-opus-4-5"), but some SDKs report "claude-opus-4.5".
+  if (m.startsWith('claude-')) m = m.replace(/(\d)\.(\d)/g, '$1-$2');
   return m;
 }
 

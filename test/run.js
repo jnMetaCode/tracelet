@@ -377,6 +377,23 @@ test('estimateCost: longest-prefix model matching, provider prefixes, unknowns',
   assert.equal(estimateCost('', 10, 10), null);
 });
 
+test('estimateCost: current generation priced right; future models unknown, not an old rate', async () => {
+  const { estimateCost } = await import('../src/cost.js');
+  const inOut = (m) => [estimateCost(m, 1_000_000, 0), estimateCost(m, 0, 1_000_000)];
+  assert.deepEqual(inOut('claude-opus-5'), [5, 25]);
+  assert.deepEqual(inOut('claude-sonnet-5'), [2, 10]);
+  assert.deepEqual(inOut('claude-fable-5-1'), [10, 50]);
+  assert.deepEqual(inOut('claude-sonnet-4-5-20250929'), [3, 15]);
+  assert.deepEqual(inOut('claude-3-opus-20240229'), [15, 75]);
+  // dotted spellings are the same model
+  assert.deepEqual(inOut('claude-opus-4.5'), [5, 25]);
+  assert.deepEqual(inOut('claude-sonnet-4.5'), [3, 15]);
+  assert.deepEqual(inOut('gpt-4.1-mini'), [0.4, 1.6]);
+  // a model we have no price for must not inherit an older one
+  assert.equal(estimateCost('claude-opus-6', 1_000_000, 0), null);
+  assert.equal(estimateCost('claude-sonnet-6', 1_000_000, 0), null);
+});
+
 test('trace summary carries a cost estimate for known models only', async () => {
   const fs = await import('node:fs');
   void fs;
@@ -945,6 +962,26 @@ test('HTTP: DNS rebinding — a loopback UI refuses foreign Host headers; ingest
   await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
 });
 
+test('HTTP: malformed requests get a 400 and never take the server down', async (t) => {
+  const net = await import('node:net');
+  const PORT = 4558, UI = 4559;
+  const { ingest, ui, ready } = startServer({ port: PORT, uiPort: UI, open: false });
+  await ready;
+  t.after(() => { ingest.close(); ui.close(); });
+  const raw = (port, target) => new Promise((resolve) => {
+    const s = net.connect(port, '127.0.0.1', () => s.write(`GET ${target} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n`));
+    let d = ''; s.on('data', (c) => (d += c)); s.on('end', () => resolve(d.split('\r\n')[0])); s.on('error', () => resolve('ERR'));
+    s.setTimeout(2000, () => { s.destroy(); resolve('NO REPLY (server crashed?)'); });
+  });
+  // reachable from any web page: <img src="http://localhost:4321/api/traces/%E0">
+  assert.match(await raw(UI, '/api/traces/%E0%A4%A'), / 400 /);
+  assert.match(await raw(UI, '//['), / 400 /);
+  assert.match(await raw(UI, 'http://[::1'), / 400 /);
+  assert.match(await raw(PORT, '//['), / 400 /);
+  assert.equal((await req(UI, 'GET', '/api/config')).status, 200, 'UI still serving');
+  assert.equal((await req(PORT, 'POST', '/v1/traces', '{}', { 'content-type': 'application/json' })).status, 200, 'ingest still serving');
+});
+
 test('HTTP: --host 0.0.0.0 exposes the UI on purpose, so any Host is served', async (t) => {
   const { ingest, ui, ready } = startServer({ port: 4548, uiPort: 4549, host: '0.0.0.0', open: false });
   await ready;
@@ -978,6 +1015,10 @@ test('--persist: the history file is compacted during the run, not only at start
   store.persistFile = null; store.persistCompactEvery = undefined; store.clear();
   store.enablePersist(file);
   assert.equal(store.list().length, 500);
+  if (process.platform !== 'win32') {
+    const { statSync } = await import('node:fs');
+    assert.equal(statSync(file).mode & 0o777, 0o600, 'the history holds prompts: owner-only');
+  }
   store.persistFile = null; store.clear();
 });
 

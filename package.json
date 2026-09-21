@@ -1,6 +1,6 @@
 {
   "name": "@jnmetacode/tracelet",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Local DevTools for AI agents: watch every LLM and tool call live, and diff two runs step by step. Any framework via OpenTelemetry, one-liners for the Vercel AI SDK and LangChain.js. Zero dependencies, 100% local.",
   "type": "module",
   "bin": {

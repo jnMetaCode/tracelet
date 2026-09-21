@@ -83,6 +83,12 @@ class Store {
       // run with what we could load and keep trying to append.
       console.error(`tracelet: could not load history from ${file}: ${e.message}`);
     }
+    // The history holds every prompt: owner-only, like other secrets on disk.
+    try {
+      if (fs.existsSync(file)) fs.chmodSync(file, 0o600);
+    } catch {
+      /* not ours to chmod (or not on this OS) — keep going */
+    }
     this.persistFile = file;
     this.appendedSinceCompact = 0;
   }
@@ -90,7 +96,7 @@ class Store {
   /** Rewrite the history file with only the spans the ring buffer retains. */
   _compact(file) {
     const batches = this.order.map((id) => [...this.traces.get(id).spans.values()]);
-    fs.writeFileSync(file, batches.map((b) => JSON.stringify(b)).join('\n') + (batches.length ? '\n' : ''));
+    fs.writeFileSync(file, batches.map((b) => JSON.stringify(b)).join('\n') + (batches.length ? '\n' : ''), { mode: 0o600 });
     this.appendedSinceCompact = 0;
   }
 
@@ -100,7 +106,7 @@ class Store {
         // Append is cheap; the file is rewritten from the ring buffer once
         // enough batches have been evicted that it holds more than we keep.
         if (++this.appendedSinceCompact > (this.persistCompactEvery ?? MAX_TRACES * 2)) this._compact(this.persistFile);
-        fs.appendFileSync(this.persistFile, JSON.stringify(spans) + '\n');
+        fs.appendFileSync(this.persistFile, JSON.stringify(spans) + '\n', { mode: 0o600 });
       } catch {
         /* persistence is best-effort; never block ingest */
       }

@@ -89,6 +89,25 @@ function hostAllowed(req, bindHost) {
   return LOOPBACK_NAMES.has(name) || /^127\.\d+\.\d+\.\d+$/.test(name);
 }
 
+// A malformed request (a bad %-escape in a trace id, an unparsable request
+// target) must cost one 400, never the process: any web page can send
+// <img src="http://localhost:4321/api/traces/%E0"> and nothing else in that
+// request is unusual.
+function guard(handler) {
+  return (req, res) => {
+    const fail = () => {
+      if (!res.headersSent) send(res, 400, { error: 'bad request' });
+      else res.destroy();
+    };
+    try {
+      const r = handler(req, res);
+      if (r && typeof r.catch === 'function') r.catch(fail);
+    } catch {
+      fail();
+    }
+  };
+}
+
 // ---- OTLP ingest handler (shared by ingest + UI servers) -----------------
 async function handleTraces(req, res) {
   try {
@@ -218,15 +237,15 @@ export function startServer({
   CONFIG.ingestPort = port;
   CONFIG.host = host;
   // Ingest server: bare OTLP endpoint on the conventional 4318.
-  const ingest = http.createServer((req, res) => {
+  const ingest = http.createServer(guard((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname !== '/v1/traces') return send(res, 404, { error: 'POST OTLP traces to /v1/traces' });
     if (req.method === 'OPTIONS') return send(res, 204, '', 'text/plain', CORS);
     if (req.method === 'POST') return handleTraces(req, res);
     return send(res, 405, { error: 'POST OTLP traces to /v1/traces' }, 'application/json', CORS);
-  });
+  }));
 
-  const ui = http.createServer((req, res) => handleUi(req, res, host));
+  const ui = http.createServer(guard((req, res) => handleUi(req, res, host)));
 
   // A busy port must read as advice, not as a Node stack trace.
   const onListenError = (which, busyPort) => async (err) => {
