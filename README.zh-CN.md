@@ -140,6 +140,7 @@ Postgres + ClickHouse + Redis + S3，或用云服务）、Arize Phoenix（`pip i
 - **有界。** 单次请求 50 MB、解压后 64 MB、单条 trace 最多 10 000 个 span（多出的只计数为 dropped、不存储）、内存中 500 条 trace。失控的 agent 拖不垮这个工具。
 - **默认私有。** 两个端口都只绑定 `127.0.0.1`（要暴露请显式 `--host 0.0.0.0`）。
   UI 的 API 不发 CORS 头，所以同一浏览器里打开的其他网页读不到你的 trace；
+  UI 只响应 `localhost` / `127.0.0.1` 的 Host，DNS rebinding 也读不到。
   只有 OTLP 摄取路径接受跨域 POST，给浏览器端 exporter 用。
 
 ## CLI

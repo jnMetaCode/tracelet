@@ -158,8 +158,9 @@ your agent ──OTLP/HTTP (pb|json)──▶  :4318  ──▶  in-memory store
   runaway agent can't take the tool down with it.
 - **Private by default.** Both ports bind to `127.0.0.1` (use `--host 0.0.0.0`
   to expose them deliberately). The UI API sends no CORS headers, so a web page
-  open in the same browser cannot read your traces; only the OTLP ingest path
-  accepts cross-origin POSTs, for browser-side exporters.
+  open in the same browser cannot read your traces, and the UI only answers to
+  `localhost` / `127.0.0.1`, so DNS-rebinding tricks can't either. Only the OTLP
+  ingest path accepts cross-origin POSTs, for browser-side exporters.
 
 ## CLI
 

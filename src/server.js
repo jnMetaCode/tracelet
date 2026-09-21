@@ -76,6 +76,19 @@ const UI_HEADER = 'x-tracelet-ui';
 const CONFIG = { ingestPort: 4318, host: '127.0.0.1' };
 const fromUi = (req) => req.headers[UI_HEADER] === '1';
 
+// DNS rebinding: a hostile site can re-point its own name at 127.0.0.1, and the
+// browser then treats http://evil.example:4321 as same-origin — CORS and the
+// custom header above no longer help. What it cannot fake is the Host header,
+// so a loopback-bound UI only answers to loopback names. With `--host` set to a
+// non-loopback address you have exposed the UI on purpose and any name goes.
+const LOOPBACK_NAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+const isLoopback = (host) => host === 'localhost' || host === '::1' || /^127\./.test(host);
+function hostAllowed(req, bindHost) {
+  if (!isLoopback(bindHost)) return true;
+  const name = String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
+  return LOOPBACK_NAMES.has(name) || /^127\.\d+\.\d+\.\d+$/.test(name);
+}
+
 // ---- OTLP ingest handler (shared by ingest + UI servers) -----------------
 async function handleTraces(req, res) {
   try {
@@ -120,14 +133,18 @@ async function serveStatic(res, urlPath) {
   }
 }
 
-function handleUi(req, res) {
+function handleUi(req, res, bindHost = CONFIG.host) {
   const url = new URL(req.url, 'http://localhost');
   const path = url.pathname;
 
   // Allow the UI server to also receive traces (some exporters hit one port).
+  // Ingest is exempt from the Host check: containers reach it by service name.
   if (path === '/v1/traces') {
     if (req.method === 'OPTIONS') return send(res, 204, '', 'text/plain', CORS);
     if (req.method === 'POST') return handleTraces(req, res);
+  }
+  if (!hostAllowed(req, bindHost)) {
+    return send(res, 403, 'tracelet only answers to localhost / 127.0.0.1. Open it at http://localhost:<ui-port>, or start it with --host to expose it.\n', 'text/plain');
   }
   if (req.method === 'OPTIONS') return send(res, 204, ''); // no CORS grant
 
@@ -209,7 +226,7 @@ export function startServer({
     return send(res, 405, { error: 'POST OTLP traces to /v1/traces' }, 'application/json', CORS);
   });
 
-  const ui = http.createServer(handleUi);
+  const ui = http.createServer((req, res) => handleUi(req, res, host));
 
   // A busy port must read as advice, not as a Node stack trace.
   const onListenError = (which, busyPort) => async (err) => {

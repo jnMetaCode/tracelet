@@ -5,6 +5,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-21
+### Security
+- **DNS rebinding.** A web page could re-point its own domain at `127.0.0.1`
+  and, being "same-origin" as far as the browser was concerned, read every
+  trace and clear the store — CORS and the `x-tracelet-ui` header don't stop
+  that. A loopback-bound UI now answers only to `localhost`, `127.0.0.1` and
+  `[::1]` in the `Host` header (anything else gets a `403`). The OTLP ingest
+  path is exempt, so exporters in containers can keep using a service name.
+  With a non-loopback `--host` the check is off: you exposed the UI on purpose.
+
+### Added
+- `prepublishOnly` release check: `npm publish` refuses to run with
+  uncommitted changes or when HEAD isn't tagged `v<version>` — npm publishes
+  the directory, not the tag.
+
 ## [0.3.0] - 2026-09-12
 ### Added
 - **Compare two runs** — select a run, press *Compare* (or `c`), pick another.
@@ -154,7 +169,8 @@ First public release.
 - Verified walkthroughs for the Vercel AI SDK and the Python OpenTelemetry
   SDK (`examples/`).
 
-[Unreleased]: https://github.com/jnMetaCode/tracelet/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jnMetaCode/tracelet/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/jnMetaCode/tracelet/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jnMetaCode/tracelet/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jnMetaCode/tracelet/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jnMetaCode/tracelet/compare/v0.1.1...v0.2.0

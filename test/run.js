@@ -919,6 +919,39 @@ test('HTTP: binds loopback by default; /api has no CORS; clear needs the UI head
   await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
 });
 
+test('HTTP: DNS rebinding — a loopback UI refuses foreign Host headers; ingest does not', async (t) => {
+  const PORT = 4538, UI = 4539;
+  const { ingest, ui, ready } = startServer({ port: PORT, uiPort: UI, open: false });
+  await ready;
+  t.after(() => { ingest.close(); ui.close(); });
+  await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
+  await req(PORT, 'POST', '/v1/traces', envelope([baseSpan({ traceId: 'd'.repeat(32) })]), { 'content-type': 'application/json' });
+
+  const evil = { host: `attacker.example:${UI}` };
+  assert.equal((await req(UI, 'GET', '/api/traces', '', evil)).status, 403, 'a rebound page must not read traces');
+  assert.equal((await req(UI, 'GET', '/', '', evil)).status, 403);
+  assert.equal((await req(UI, 'POST', '/api/clear', '', { ...evil, 'x-tracelet-ui': '1' })).status, 403, 'nor clear them');
+  const list = JSON.parse((await req(UI, 'GET', '/api/traces')).body);
+  assert.equal(list.length, 1, 'the refused clear must not have run');
+
+  for (const host of [`localhost:${UI}`, `127.0.0.1:${UI}`, `[::1]:${UI}`, 'localhost']) {
+    assert.equal((await req(UI, 'GET', '/api/traces', '', { host })).status, 200, `Host: ${host}`);
+  }
+  // Exporters in containers reach ingest by service name — keep accepting them.
+  const ing = await req(PORT, 'POST', '/v1/traces', envelope([baseSpan({ traceId: 'c'.repeat(32) })]), { 'content-type': 'application/json', host: `tracelet:${PORT}` });
+  assert.equal(ing.status, 200);
+  const viaUi = await req(UI, 'POST', '/v1/traces', envelope([baseSpan({ traceId: 'b'.repeat(32) })]), { 'content-type': 'application/json', host: `tracelet:${UI}` });
+  assert.equal(viaUi.status, 200);
+  await req(UI, 'POST', '/api/clear', '', { 'x-tracelet-ui': '1' });
+});
+
+test('HTTP: --host 0.0.0.0 exposes the UI on purpose, so any Host is served', async (t) => {
+  const { ingest, ui, ready } = startServer({ port: 4548, uiPort: 4549, host: '0.0.0.0', open: false });
+  await ready;
+  t.after(() => { ingest.close(); ui.close(); });
+  assert.equal((await req(4549, 'GET', '/api/traces', '', { host: '192.168.1.20:4549' })).status, 200);
+});
+
 test('HTTP: --host 0.0.0.0 opts into all interfaces', async (t) => {
   const { ingest, ui, ready } = startServer({ port: 4428, uiPort: 4429, host: '0.0.0.0', open: false });
   await ready;
